@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, BorderStyle, WidthType, VerticalAlign, ShadingType, UnderlineType, PageNumber, Footer } from "docx";
 import { saveAs } from "file-saver";
 
@@ -18,6 +18,27 @@ const EMP = {
 const SUELDOS = { 42: 539000, 30: 385000, 20: 256667 };
 const DIAS_C = ["Lun","Mar","Mie","Jue","Vie","Sab","Dom"];
 const DIAS_F = ["Lunes","Martes","Miercoles","Jueves","Viernes","Sabado","Domingo"];
+const WEBHOOK = "https://script.google.com/macros/s/AKfycbyXuD--zD-R40H-Lin09aotxP0342f2SvvT3DO9tzXtHgaAxTn1NXfzy2aTUffTHiYjcw/exec";
+
+// ── API Trabajadores ──────────────────────────────────────────────────────────
+async function apiGuardar(trabajador) {
+  try {
+    await fetch(WEBHOOK, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({accion:"guardar",...trabajador}) });
+  } catch(e) { console.error("Error guardando trabajador:", e); }
+}
+async function apiDesactivar(id) {
+  try {
+    await fetch(WEBHOOK, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({accion:"desactivar", id}) });
+  } catch(e) { console.error("Error desactivando trabajador:", e); }
+}
+async function apiListar(empresa) {
+  try {
+    const r = await fetch(WEBHOOK+"?empresa="+encodeURIComponent(empresa));
+    const d = await r.json();
+    return d.trabajadores || [];
+  } catch(e) { return []; }
+}
+
 const FN = {
   garzon: "El trabajador se compromete a desempeniar las funciones de Garzon - Barista, las cuales comprenderan, de forma declarativa y no limitativa, las siguientes responsabilidades especificas tanto para el area de cafeteria como para el sector de tienda del local: Gestion de Barra, Servicio y Hospitalidad: Recibir y atender cordialmente a los clientes en salon, barra, formato take away o canales de delivery. Sera responsable de la toma de pedidos, sugerencias comerciales cruzadas (cafeteria y articulos de tienda) y de la preparacion de cafe especializado, tes, bebidas frias, calientes y postres, siguiendo estrictamente las recetas, gramajes y estandares esteticos de la empresa. Asimismo, debera calibrar diariamente molinos y maquinarias, resguardar el correcto uso de la vajilla e informar fallas tecnicas a la jefatura. Operacion de Caja y Custodia de Valores: Ejecutar los procesos de apertura, operacion y cuadratura diaria de los sistemas de cajas registradoras, terminales de tarjetas, efectivo o transferencias, procesando de manera unificada tanto el consumo de cafeteria como las ventas de la tienda de alimentos y regalos. El trabajador actua como custodio directo de los fondos y documentos recibidos en su turno, debiendo reportar cualquier descuadre de forma inmediata a la administracion. Protocolos de Apertura, Cierre y Mantencion Operativa: Ejecutar los procedimientos de apertura o cierre fisico del local segun el turno asignado (encendido/apagado de equipos, alarmas y accesos). El turno de apertura ejecutara el aseo, orden y sanitizacion profunda inicial de todas las areas (salon, barra y gondolas) junto con la instalacion de carteles y pizarras publicas; mientras que el de cierre resguardara dichos elementos, dejando el local impecable y vaciado de residuos. Asimismo, durante toda la jornada, el trabajador debera monitorear y mantener activamente la limpieza y orden de los espacios, quedando facultado y obligado a realizar tareas inmediatas de aseo, ordenamiento o sanitizacion de emergencia ante cualquier contingencia, derrame o requerimiento sanitario que se presente en el momento. Control de Stock, Exhibicion y Rotacion: Recibir, registrar y verificar la calidad, temperatura y volumen de los insumos de proveedores. Es responsabilidad del trabajador mantener el stock de barra y la reposicion constante de las gondolas y vitrinas de la tienda, asegurando una exhibicion limpia y atractiva. Debera realizar los inventarios periodicos solicitados y controlar rigurosamente las fechas de caducidad aplicando el sistema de rotacion FIFO / PEPS (Primero en entrar, primero en salir) para evitar mermas de stock.",
   cocina: "El trabajador se compromete a desempeniar las funciones de Personal de Cocina y Produccion, atendiendo de manera unificada las lineas de salon, despacho mayorista y servicios de catering o eventos: Produccion Gastronomica e Insumos: Elaborar desde cero masas (pan, pizzas, waffles), pasteleria, almuerzos, postres y platos de la carta, cumpliendo rigurosamente los gramajes y fichas tecnicas de la empresa. Tendra la obligacion de confeccionar y documentar las recetas para el recetario institucional cuando una preparacion no este estandarizada. Asimismo, sera responsable de recibir y verificar tecnicamente la calidad, temperatura y estado de las materias primas entregadas por proveedores. Ante requerimientos de la operacion o de la jefatura, estara facultado y obligado a apoyar activamente en la barra y en el montaje de postres. Control de Produccion, Logistica e Higiene: Monitorear stock, reportar mermas y aplicar estrictamente la rotacion FIFO / PEPS. Es obligacion estricta del trabajador registrar de forma diaria el volumen de produccion ejecutado, informar oportunamente a la jefatura la disponibilidad de stock terminado para despacho, y revisar constantemente que los productos elaborados y almacenados no se encuentren caducados. Debera fraccionar, porcionar, rotular y embalar tecnicamente los productos destinados a cafeteria, clientes externos o eventos. Mantendra la limpieza profunda y sanitizacion de su estacion, mesones, artefactos y maquinarias (incluyendo el lavado constante de utensilios, platos sucios, herramientas y guardado de loza), asegurando el uso eficiente y apagado seguro de los servicios y equipos al cierre del turno.",
@@ -377,15 +398,44 @@ const pill = (a) => ({ padding:"8px 16px", borderRadius:20, fontSize:13, cursor:
 const dtcSt = (a) => ({ padding:"10px 6px", border:a?"2px solid #185FA5":"1px solid #e0e0db", borderRadius:10, cursor:"pointer", textAlign:"center", background:a?"#EBF3FF":"white" });
 
 function LBL({children, first}) { return <label style={{...S.lbl, marginTop:first?0:14}}>{children}</label>; }
-function FormTrabSimple({nombre, onNombre, rut, onRut, cargo, onCargo}) {
+function FormTrabSimple({nombre, onNombre, rut, onRut, cargo, onCargo, trabSheet, loadingTrabs, onSelectTrab}) {
+  const [modo, setModo] = useState("lista"); // "lista" | "manual"
   return (
     <div style={S.card}>
-      <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Datos del trabajador</div>
-      <div style={S.r2}>
-        <div><LBL first>Nombre y apellido</LBL><input style={S.inp} value={nombre} onChange={e=>onNombre(e.target.value)} placeholder="Juan Perez"/></div>
-        <div><LBL first>RUT</LBL><input style={S.inp} value={rut} onChange={e=>onRut(e.target.value)} placeholder="12.345.678-9"/></div>
+      <div style={{fontSize:15,fontWeight:700,marginBottom:10}}>Trabajador</div>
+      <div style={{display:"flex",gap:8,marginBottom:14}}>
+        <button style={pill(modo==="lista")} onClick={()=>setModo("lista")}>📋 Seleccionar</button>
+        <button style={pill(modo==="manual")} onClick={()=>setModo("manual")}>✏️ Ingresar manual</button>
       </div>
-      <LBL>Cargo</LBL><input style={S.inp} value={cargo} onChange={e=>onCargo(e.target.value)} placeholder="Garzon - Barista"/>
+      {modo==="lista" && (
+        loadingTrabs
+          ? <div style={{color:"#888",fontSize:13,padding:"10px 0"}}>Cargando trabajadores...</div>
+          : trabSheet.length===0
+            ? <div style={{color:"#888",fontSize:13,padding:"10px 0"}}>No hay trabajadores activos en esta empresa. Genera primero un contrato.</div>
+            : <div>
+                {trabSheet.map(t=>(
+                  <div key={t.id} onClick={()=>{ onSelectTrab(t); setModo("datos"); }}
+                    style={{display:"flex",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #e8e8e5",gap:10,cursor:"pointer"}}>
+                    <div style={{width:34,height:34,borderRadius:"50%",background:"#EBF3FF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:"#185FA5",flexShrink:0}}>{(t.nombre||"?").charAt(0)}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:600}}>{t.nombre} {t.apellido}</div>
+                      <div style={{fontSize:11,color:"#888"}}>{t.cargo||"-"} · {t.rut}</div>
+                    </div>
+                    <span style={{color:"#185FA5",fontSize:18}}>›</span>
+                  </div>
+                ))}
+              </div>
+      )}
+      {(modo==="manual"||modo==="datos") && (
+        <div>
+          {modo==="datos" && <div style={{background:"#E1F5EE",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#0F6E56",marginBottom:10}}>✓ Datos cargados — puedes editar si es necesario</div>}
+          <div style={S.r2}>
+            <div><LBL first>Nombre y apellido</LBL><input style={S.inp} value={nombre} onChange={e=>onNombre(e.target.value)} placeholder="Juan Perez"/></div>
+            <div><LBL first>RUT</LBL><input style={S.inp} value={rut} onChange={e=>onRut(fmtRut(e.target.value))} placeholder="12.345.678-9"/></div>
+          </div>
+          <LBL>Cargo</LBL><input style={S.inp} value={cargo} onChange={e=>onCargo(e.target.value)} placeholder="Garzon - Barista"/>
+        </div>
+      )}
     </div>
   );
 }
@@ -438,6 +488,20 @@ export default function App() {
   const [empresa, setEmpresa] = useState("Malvarrosa SpA");
   const [alert, setAlert] = useState({t:"",m:""});
   const [loading, setLoading] = useState(false);
+  const [trabSheet, setTrabSheet] = useState([]);
+  const [loadingTrabs, setLoadingTrabs] = useState(false);
+
+  // Cargar trabajadores del Sheet cuando cambia empresa o tab
+  const cargarTrabajadores = useCallback(async (emp) => {
+    setLoadingTrabs(true);
+    const lista = await apiListar(emp);
+    setTrabSheet(lista.filter(t => t.estado === "Activo"));
+    setLoadingTrabs(false);
+  }, []);
+
+  useEffect(() => {
+    if (docTab !== "plazo_fijo") cargarTrabajadores(empresa);
+  }, [empresa, docTab, cargarTrabajadores]);
 
   const [pf, setPf] = useState({nombre:"",apellido:"",rut:"",nac:"Chilena",nacF:"",civil:"Soltero(a)",calle:"",num:"",comuna:"",ciudad:"",email:"",tel:"",banco:"",cuenta:"",tipoCuenta:"Cuenta Rut"});
   const [inicio, setInicio] = useState(today);
@@ -487,6 +551,16 @@ export default function App() {
         if (!pf.nombre||!pf.apellido) throw new Error("Ingresa nombre y apellido");
         if (!getCargoN()) throw new Error("Selecciona un cargo");
         await generarContratoPF({...pf, empresa, inicio, termino, horas, colacion, sueldo, turno, funciones, cargo:getCargoN()});
+        // Guardar en Google Sheets
+        await apiGuardar({
+          id: Date.now().toString(),
+          nombre: pf.nombre, apellido: pf.apellido, rut: pf.rut,
+          empresa, cargo: getCargoN(),
+          domicilio: [pf.calle,pf.num,pf.comuna,pf.ciudad].filter(Boolean).join(", "),
+          email: pf.email, telefono: pf.tel,
+          banco: pf.banco, tipoCuenta: pf.tipoCuenta, cuenta: pf.cuenta,
+          fechaIngreso: inicio, estado: "Activo"
+        });
       } else if (docTab==="anexo") {
         if (!tNombre) throw new Error("Ingresa el nombre del trabajador");
         if (!anDesc) throw new Error("Describe el cambio");
@@ -605,7 +679,13 @@ export default function App() {
         </>}
 
         {docTab==="anexo" && <>
-          <FormTrabSimple nombre={tNombre} onNombre={setTNombre} rut={tRut} onRut={setTRut} cargo={tCargo} onCargo={setTCargo}/>
+          <FormTrabSimple
+            nombre={tNombre} onNombre={setTNombre}
+            rut={tRut} onRut={setTRut}
+            cargo={tCargo} onCargo={setTCargo}
+            trabSheet={trabSheet} loadingTrabs={loadingTrabs}
+            onSelectTrab={t=>{ setTNombre(t.nombre+" "+t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); }}
+          />
           <div style={S.card}>
             <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Datos del anexo</div>
             <LBL first>Fecha del anexo</LBL><input style={S.inp} type="date" value={anFecha} onChange={e=>setAnFecha(e.target.value)}/>
@@ -626,7 +706,13 @@ export default function App() {
         </>}
 
         {docTab==="am_inasistencia" && <>
-          <FormTrabSimple nombre={tNombre} onNombre={setTNombre} rut={tRut} onRut={setTRut} cargo={tCargo} onCargo={setTCargo}/>
+          <FormTrabSimple
+            nombre={tNombre} onNombre={setTNombre}
+            rut={tRut} onRut={setTRut}
+            cargo={tCargo} onCargo={setTCargo}
+            trabSheet={trabSheet} loadingTrabs={loadingTrabs}
+            onSelectTrab={t=>{ setTNombre(t.nombre+" "+t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); }}
+          />
           <div style={S.card}>
             <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Amonestacion por inasistencias</div>
             <LBL first>Fecha de la carta</LBL><input style={S.inp} type="date" value={aiFecha} onChange={e=>setAiFecha(e.target.value)}/>
@@ -643,7 +729,13 @@ export default function App() {
         </>}
 
         {docTab==="am_atraso" && <>
-          <FormTrabSimple nombre={tNombre} onNombre={setTNombre} rut={tRut} onRut={setTRut} cargo={tCargo} onCargo={setTCargo}/>
+          <FormTrabSimple
+            nombre={tNombre} onNombre={setTNombre}
+            rut={tRut} onRut={setTRut}
+            cargo={tCargo} onCargo={setTCargo}
+            trabSheet={trabSheet} loadingTrabs={loadingTrabs}
+            onSelectTrab={t=>{ setTNombre(t.nombre+" "+t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); }}
+          />
           <div style={S.card}>
             <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Amonestacion por atrasos</div>
             <LBL first>Fecha de la carta</LBL><input style={S.inp} type="date" value={aaFecha} onChange={e=>setAaFecha(e.target.value)}/>
@@ -658,7 +750,13 @@ export default function App() {
         </>}
 
         {docTab==="no_renovacion" && <>
-          <FormTrabSimple nombre={tNombre} onNombre={setTNombre} rut={tRut} onRut={setTRut} cargo={tCargo} onCargo={setTCargo}/>
+          <FormTrabSimple
+            nombre={tNombre} onNombre={setTNombre}
+            rut={tRut} onRut={setTRut}
+            cargo={tCargo} onCargo={setTCargo}
+            trabSheet={trabSheet} loadingTrabs={loadingTrabs}
+            onSelectTrab={t=>{ setTNombre(t.nombre+" "+t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); }}
+          />
           <div style={S.card}>
             <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Carta de no renovacion</div>
             <div style={{background:"#FFF3E0",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#E65100",marginBottom:14,border:"1px solid #FFB74D"}}>Art. 159 N4 CT — Notificacion formal de que el contrato a plazo fijo NO sera renovado.</div>
