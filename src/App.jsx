@@ -1,0 +1,668 @@
+import { useState, useCallback } from "react";
+import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, BorderStyle, WidthType, VerticalAlign, ShadingType, UnderlineType, PageNumber, Footer } from "docx";
+import { saveAs } from "file-saver";
+
+// ── Datos empresas ────────────────────────────────────────────────────────────
+const EMP = {
+  "Malvarrosa SpA": {
+    nombre: "MALVARROSA SPA", rut: "76.475.913-3",
+    rep: "MAGALY DEL CARMEN FIGUEROA ASTUDILLO", repRut: "6.974.618-7",
+    dom: "Av. Ortuzar 250, Nunoa, Santiago"
+  },
+  "Eric Hansen EIRL": {
+    nombre: "VENTA DE ALIMENTOS ERIC FELIPE HANSEN FIGUEROA EIRL", rut: "77.840.316-1",
+    rep: "ERIC FELIPE HANSEN FIGUEROA", repRut: "19.077.228-4",
+    dom: "Av. Ossa 1624, Nunoa, Santiago"
+  }
+};
+const SUELDOS = { 42: 539000, 30: 385000, 20: 256667 };
+const DIAS_C = ["Lun","Mar","Mie","Jue","Vie","Sab","Dom"];
+const DIAS_F = ["Lunes","Martes","Miercoles","Jueves","Viernes","Sabado","Domingo"];
+const FN = {
+  garzon: "El trabajador se compromete a desempeniar las funciones de Garzon - Barista. Gestion de Barra: Recibir y atender a los clientes en salon, barra, take away o delivery. Responsable de la toma de pedidos y preparacion de cafe especializado, tes y bebidas siguiendo recetas y gramajes de la empresa. Calibrar molinos y maquinarias. Caja y Custodia: Apertura, operacion y cuadratura diaria de cajas y terminales. Custodio directo de los fondos del turno. Stock: Recibir y verificar insumos de proveedores, mantener stock y reposicion de gondolas, controlar fechas de caducidad con FIFO/PEPS.",
+  cocina: "El trabajador se compromete a desempeniar las funciones de Personal de Cocina y Produccion. Produccion: Elaborar masas, pasteleria, almuerzos y postres cumpliendo gramajes y fichas tecnicas. Confeccionar recetas para el recetario institucional. Recibir y verificar materias primas. Higiene: Monitorear stock, reportar mermas y aplicar FIFO/PEPS. Registrar diariamente volumen de produccion. Mantener limpieza profunda de estacion, mesones y maquinarias.",
+  operario: "El trabajador se compromete a desempeniar las funciones de Operario Multifuncional de Almacen y Alimentos al Paso. Apertura y Cierre: Encendido, supervision y apagado de maquinaria. Mantener local limpio con senaletica actualizada. Caja y Pedidos: Atender al publico y operar sistemas de venta. Responsable de la custodia del efectivo y cuadratura de caja. Monitorear inventario y reponer mercancias con FIFO/PEPS."
+};
+const RIOSH_TABLA_ATRASOS = "Tabla multas segun RIOSH Titulo XVII Art.63: 5 a 15 min = 20% del maximo; 15 a 25 min = 50% del maximo; 25 a 45 min = 80% del maximo; mas de 45 min = 100% del maximo. El maximo aplicable equivale al 25% de la remuneracion diaria.";
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmtF(s) {
+  if (!s) return "";
+  try {
+    const d = new Date(s + "T12:00:00");
+    const m = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+    return d.getDate() + " de " + m[d.getMonth()] + " de " + d.getFullYear();
+  } catch(e) { return s; }
+}
+function numL(n) {
+  const x = parseInt(n); if (isNaN(x)) return "";
+  const u = ["","un","dos","tres","cuatro","cinco","seis","siete","ocho","nueve","diez","once","doce","trece","catorce","quince","dieciseis","diecisiete","dieciocho","diecinueve","veinte","veintiun","veintidos","veintitres","veinticuatro","veinticinco","veintiseis","veintisiete","veintiocho","veintinueve"];
+  const d2 = ["","","veinte","treinta","cuarenta","cincuenta","sesenta","setenta","ochenta","noventa"];
+  const c = ["","ciento","doscientos","trescientos","cuatrocientos","quinientos","seiscientos","setecientos","ochocientos","novecientos"];
+  if (x===0) return "cero"; if (x<30) return u[x];
+  if (x<100) { const dd=Math.floor(x/10),uu=x%10; return uu===0?d2[dd]:d2[dd]+" y "+u[uu]; }
+  if (x===100) return "cien";
+  if (x<1000) { const cc=Math.floor(x/100),r=x%100; return c[cc]+(r?" "+numL(r):""); }
+  if (x<1000000) { const mm=Math.floor(x/1000),r=x%1000; return (mm===1?"mil":numL(mm)+" mil")+(r?" "+numL(r):""); }
+  return x.toLocaleString("es-CL");
+}
+function calcBreak(e, s, col) {
+  if (!e||!s) return "00:00";
+  const ep=(e+":0").split(":").map(Number), sp=(s+":0").split(":").map(Number);
+  const eM=ep[0]*60+(ep[1]||0), sM=sp[0]*60+(sp[1]||0);
+  if (sM<=eM) return "00:00";
+  const mid=Math.round((eM+sM)/2)-Math.floor(col/2);
+  return String(Math.floor(mid/60)).padStart(2,"0")+":"+String(mid%60).padStart(2,"0");
+}
+function getLugar(emp) {
+  return emp==="Malvarrosa SpA" ? "Casa Turquesa, Av. Ortuzar 250, Nunoa, Santiago" : "Av. Ossa 1624, Nunoa, Santiago";
+}
+
+// ── DOCX helpers ──────────────────────────────────────────────────────────────
+const FONT = "Times New Roman";
+const SZ = 22; const SZ_T = 24;
+const brd = { style: BorderStyle.SINGLE, size: 4, color: "000000" };
+const borders = { top:brd, bottom:brd, left:brd, right:brd };
+const noBorders = { top:{style:BorderStyle.NONE}, bottom:{style:BorderStyle.NONE}, left:{style:BorderStyle.NONE}, right:{style:BorderStyle.NONE} };
+
+function P(runs, align, spacingAfter) {
+  return new Paragraph({ children: runs, alignment: align||AlignmentType.JUSTIFIED, spacing: { after: spacingAfter!==undefined?spacingAfter:80 } });
+}
+function T(text, opts={}) {
+  return new TextRun({ text, font:FONT, size:SZ, bold:opts.bold||false, underline:opts.underline?{type:UnderlineType.SINGLE}:undefined });
+}
+function TT(text, opts={}) {
+  return new TextRun({ text, font:FONT, size:SZ_T, bold:opts.bold||false, underline:opts.underline?{type:UnderlineType.SINGLE}:undefined });
+}
+function titulo(text) {
+  return P([TT(text, {bold:true, underline:true})], AlignmentType.CENTER, 120);
+}
+function art(label, content) {
+  return P([T(label+" ", {bold:true}), T(content)], AlignmentType.JUSTIFIED, 80);
+}
+function makeFooter(empNombre, trabNombre) {
+  return new Footer({ children: [
+    new Paragraph({ alignment: AlignmentType.CENTER, children: [
+      new TextRun({text:"Contrato de trabajo pagina ", font:FONT, size:16}),
+      new TextRun({children:[PageNumber.CURRENT], font:FONT, size:16}),
+      new TextRun({text:"/", font:FONT, size:16}),
+      new TextRun({children:[PageNumber.TOTAL_PAGES], font:FONT, size:16}),
+      new TextRun({text:"  —  "+empNombre+" y "+trabNombre, font:FONT, size:16}),
+    ]})
+  ]});
+}
+function cellT(text, width, opts={}) {
+  return new TableCell({
+    borders, verticalAlign: VerticalAlign.CENTER,
+    width: { size: width, type: WidthType.DXA },
+    shading: opts.header ? { fill:"D9D9D9", type:ShadingType.CLEAR } : opts.section ? { fill:"BFBFBF", type:ShadingType.CLEAR } : undefined,
+    margins: { top:50, bottom:50, left:80, right:80 },
+    children: [new Paragraph({ alignment:AlignmentType.CENTER, children:[new TextRun({text, font:FONT, size:16, bold:opts.bold||opts.header||opts.section||false})] })]
+  });
+}
+
+// ── Generar Contrato PF ───────────────────────────────────────────────────────
+async function generarContratoPF(data) {
+  const emp = EMP[data.empresa];
+  const dom = [data.calle, data.num, data.comuna, data.ciudad].filter(Boolean).join(", ");
+  const hoy = fmtF(new Date().toISOString().split("T")[0]);
+  const colW = [1800,1000,1000,1000,1000,1000,1000,1000];
+  const dias = ["Seccion","Lunes","Martes","Miercoles","Jueves","Viernes","Sabado","Domingo"];
+
+  function makeRow(vals, isHeader, isSection) {
+    return new TableRow({ children: vals.map((v,i) => new TableCell({
+      borders, verticalAlign:VerticalAlign.CENTER,
+      width:{ size:colW[i], type:WidthType.DXA },
+      shading: isHeader?{fill:"D9D9D9",type:ShadingType.CLEAR}:isSection?{fill:"BFBFBF",type:ShadingType.CLEAR}:undefined,
+      margins:{top:50,bottom:50,left:80,right:80},
+      children:[new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:v,font:FONT,size:16,bold:isHeader||isSection||(i===0&&!isHeader)})]  })]
+    }))});
+  }
+  function sectionRow(label) {
+    return new TableRow({ children:[new TableCell({
+      borders, columnSpan:8,
+      width:{size:colW.reduce((a,b)=>a+b,0), type:WidthType.DXA},
+      shading:{fill:"BFBFBF",type:ShadingType.CLEAR},
+      margins:{top:50,bottom:50,left:80,right:80},
+      children:[new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:label,font:FONT,size:16,bold:true})]})]
+    })]});
+  }
+
+  const turnoRows = [];
+  const entradas = DIAS_F.map((d,i) => { const r=data.turno[i]; return r.on&&r.e ? r.e : "00:00"; });
+  const salidas1 = DIAS_F.map((d,i) => { const r=data.turno[i]; if (!r.on||!r.e||!r.s) return "00:00"; return calcBreak(r.e,r.s,data.colacion); });
+  const breaks  = DIAS_F.map((d,i) => { const r=data.turno[i]; if (!r.on) return "00:00"; return String(Math.floor(data.colacion/60)).padStart(2,"0")+":"+String(data.colacion%60).padStart(2,"0"); });
+  const entradas2= DIAS_F.map((d,i) => { const r=data.turno[i]; if (!r.on||!r.e||!r.s) return "00:00"; const br=calcBreak(r.e,r.s,data.colacion); const [bh,bm]=br.split(":").map(Number); const [e1h,e1m]=salidas1[i].split(":").map(Number); const t=e1h*60+e1m+bh*60+bm; return String(Math.floor(t/60)).padStart(2,"0")+":"+String(t%60).padStart(2,"0"); });
+  const salidas2 = DIAS_F.map((d,i) => { const r=data.turno[i]; return r.on&&r.s ? r.s : "00:00"; });
+
+  const tablaJornada = new Table({
+    width:{size:colW.reduce((a,b)=>a+b,0),type:WidthType.DXA}, columnWidths:colW,
+    rows:[
+      makeRow(dias,true,false),
+      sectionRow("Primera mitad jornada"),
+      makeRow(["Entrada",...entradas],false,false),
+      makeRow(["Salida",...salidas1],false,false),
+      sectionRow("Tiempo Descanso"),
+      makeRow(["Libre disposicion",...breaks],false,false),
+      sectionRow("Segunda mitad jornada"),
+      makeRow(["Entrada",...entradas2],false,false),
+      makeRow(["Salida",...salidas2],false,false),
+    ]
+  });
+
+  const tablaFirmas = new Table({
+    width:{size:9360,type:WidthType.DXA}, columnWidths:[4680,4680],
+    rows:[
+      new TableRow({children:[
+        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:300,bottom:80,left:120,right:120},children:[P([T("_________________________________")],AlignmentType.CENTER,0)]}),
+        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:300,bottom:80,left:120,right:120},children:[P([T("_________________________________")],AlignmentType.CENTER,0)]}),
+      ]}),
+      new TableRow({children:[
+        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:0,bottom:0,left:120,right:120},children:[
+          P([T(emp.nombre,{bold:true})],AlignmentType.CENTER,0),
+          P([T(emp.rut)],AlignmentType.CENTER,0),
+          P([T("Empleador")],AlignmentType.CENTER,0),
+        ]}),
+        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:0,bottom:0,left:120,right:120},children:[
+          P([T(data.nombre+" "+data.apellido,{bold:true})],AlignmentType.CENTER,0),
+          P([T(data.rut)],AlignmentType.CENTER,0),
+          P([T("Trabajador")],AlignmentType.CENTER,0),
+        ]}),
+      ]}),
+    ]
+  });
+
+  const doc = new Document({ sections:[{
+    properties:{ page:{ size:{width:11906,height:16838}, margin:{top:1134,right:1134,bottom:1134,left:1134} } },
+    footers:{ default: makeFooter(emp.nombre, data.apellido+" "+data.nombre) },
+    children:[
+      titulo("CONTRATO DE TRABAJO"),
+      P([]),
+      P([
+        T("En Nunoa, a "), T(hoy,{bold:true}), T(", entre "), T(emp.nombre,{bold:true}),
+        T(", R.U.T. "+emp.rut+", con domicilio en "+emp.dom+", representado legalmente por don(a) "),
+        T(emp.rep,{bold:true}), T(", cedula de identidad "+emp.repRut+", en adelante el \"Empleador\", y don(a) "),
+        T(data.nombre+" "+data.apellido,{bold:true}),
+        T(", de nacionalidad "+data.nac+", nacido(a) el "+fmtF(data.nacF)+", domiciliado(a) en "+dom+", RUT "+data.rut+", estado civil "+data.civil+", email: "+data.email+", telefono: "+data.tel+", cuenta bancaria "+data.banco+", "+data.tipoCuenta+" N "+data.cuenta+", en adelante tambien denominado \"TRABAJADOR\", se ha convenido el siguiente Contrato Individual de Trabajo:"),
+      ], AlignmentType.JUSTIFIED, 120),
+      art("PRIMERO :", data.funciones+" El trabajador se desempenara en "+getLugar(data.empresa)+", pudiendo ser trasladado a otro Departamento o Seccion de la Oficina Principal o de cualquiera de las Agencias del Empleador, a condicion que se trate de labores similares, en la misma ciudad, y sin que ello importe menoscabo para el trabajador, todo ello sujeto a las necesidades operativas de la Empresa."),
+      P([T("SEGUNDO : ",{bold:true}), T("JORNADA DE TRABAJO. El trabajador cumplira una jornada semanal ordinaria de "), T(data.horas+" horas",{bold:true}), T(", de acuerdo a la siguiente distribucion semanal:")], AlignmentType.JUSTIFIED, 60),
+      tablaJornada,
+      P([T("La asignacion de este turno sera fija durante toda la vigencia del contrato, salvo acuerdo expreso entre las partes mediante anexo de contrato. El tiempo destinado a la colacion es de "), T(data.colacion+" minutos",{bold:true}), T(" y es de cargo del trabajador.")], AlignmentType.JUSTIFIED, 80),
+      art("TERCERO :", "Cuando por necesidades de funcionamiento de la Empresa sea necesario pactar trabajo en tiempo extraordinario, el Empleado que lo acuerde se obligara a cumplir el horario que al efecto determine la Empleadora, dentro de los limites legales. Dicho acuerdo constara por escrito y se firmara por ambas partes, previamente a la realizacion del trabajo. El tiempo extraordinario se remunerara con el recargo legal del 50% sobre el sueldo convenido para la jornada ordinaria y se liquidara y pagara conjuntamente con la remuneracion del respectivo periodo."),
+      art("CUARTO :", "El empleado percibira un sueldo de $"+parseInt(data.sueldo).toLocaleString("es-CL")+" ("+numL(data.sueldo)+" pesos) mensuales, pagaderos por meses vencidos. Las deducciones que la Empleadora podra practicar a las remuneraciones son todas aquellas que dispone el articulo 58 del Codigo del Trabajo."),
+      art("QUINTO :", "El trabajador acepta y autoriza al Empleador para que haga las deducciones que establecen las leyes vigentes y para que le descuente las horas y el tiempo no trabajado debido a atrasos, inasistencias o permisos y, ademas, la rebaja del monto de las multas establecidas en el Reglamento Interno de Orden, Higiene y Seguridad, en caso que procedieren."),
+      art("SEXTO :", "La Empresa se obliga a pagar al empleado una gratificacion anual equivalente al 25% del total de las remuneraciones mensuales que este hubiere percibido en el ano, con tope de 4,75 Ingresos Minimos Mensuales. Esta gratificacion se calculara, liquidara y anticipara mensualmente en forma coetanea con la remuneracion del mes respectivo, siendo cada abono equivalente a la doceava parte de la gratificacion anual. La gratificacion convenida sustituye a la que resulte de la aplicacion de los articulos 47 y siguientes del Codigo del Trabajo, siempre que esta ultima fuere igual o inferior a aquella. Los valores anticipados mensualmente se reajustaran en conformidad con lo dispuesto en el articulo 63 del Codigo del Trabajo."),
+      art("SEPTIMO :", "El trabajador se obliga y compromete expresamente a cumplir las instrucciones que le sean impartidas por su jefe inmediato o por la Gerencia de la empresa y a acatar en todas sus partes las disposiciones establecidas en el Reglamento de Orden, Higiene y Seguridad, las que declara conocer y que se consideran parte integrante del presente contrato, reglamento del cual el trabajador recibe un ejemplar en este acto."),
+      art("OCTAVO :", "Las partes acuerdan que los atrasos reiterados, sin causa justificada, se consideraran incumplimiento grave de las obligaciones que impone el presente contrato y daran lugar a la aplicacion de la caducidad del contrato, contemplada en el Art. 160 N7 del Codigo del Trabajo. Se entendera por atraso reiterado el llegar despues de la hora de ingreso durante 7 dias maximos, seguidos o no, en cada mes calendario."),
+      art("NOVENO :", "El presente contrato comenzara el "+fmtF(data.inicio)+" y tendra duracion hasta el dia "+fmtF(data.termino)+", y cualquiera de las partes podra ponerle termino."),
+      art("DECIMO :", "Para todas las cuestiones a que eventualmente pueda dar origen este contrato, las partes fijan domicilio en la ciudad de Nunoa."),
+      art("DECIMO PRIMERO :", "Todas las recetas, preparaciones, fichas tecnicas, procesos productivos, formulas y creaciones desarrolladas por el trabajador en el ejercicio de sus funciones seran de propiedad exclusiva del Empleador. El trabajador se obliga a no divulgar, reproducir ni utilizar dicha informacion fuera de la empresa, ni durante ni despues de la vigencia del presente contrato."),
+      art("DECIMO SEGUNDO :", "Se deja constancia que el Empleado ingreso al servicio de la Empresa con fecha "+fmtF(data.inicio)+". El presente contrato se firma en dos ejemplares, quedando en este mismo acto uno en poder de cada contratante."),
+      new Paragraph({ children:[new TextRun({text:"", break:1})], pageBreakBefore:true }),
+      titulo("CONTRATO DE TRABAJO"),
+      P([T("cada contratante.")], AlignmentType.JUSTIFIED, 400),
+      tablaFirmas,
+    ]
+  }]});
+
+  const blob = await Packer.toBlob(doc);
+  saveAs(blob, "Contrato_"+data.apellido+"_"+data.nombre+"_"+data.inicio+".docx");
+}
+
+// ── Generar Anexo ─────────────────────────────────────────────────────────────
+async function generarAnexo(data) {
+  const emp = EMP[data.empresa];
+  const hoy = fmtF(new Date().toISOString().split("T")[0]);
+  const tiposMap = { plazo:"Prorroga de plazo fijo", indefinido:"Conversion a contrato indefinido (Art. 159 N4 CT)", sueldo:"Cambio de sueldo", cargo:"Cambio de cargo", horario:"Cambio de horario", otro:"Modificacion contractual" };
+
+  const tablaFirmas = new Table({
+    width:{size:9360,type:WidthType.DXA}, columnWidths:[4680,4680],
+    rows:[
+      new TableRow({children:[
+        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:300,bottom:80,left:120,right:120},children:[P([T("_________________________________")],AlignmentType.CENTER,0)]}),
+        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:300,bottom:80,left:120,right:120},children:[P([T("_________________________________")],AlignmentType.CENTER,0)]}),
+      ]}),
+      new TableRow({children:[
+        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:0,bottom:0,left:120,right:120},children:[P([T(emp.nombre,{bold:true})],AlignmentType.CENTER,0),P([T(emp.rut)],AlignmentType.CENTER,0),P([T("Empleador")],AlignmentType.CENTER,0)]}),
+        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:0,bottom:0,left:120,right:120},children:[P([T(data.tNombre,{bold:true})],AlignmentType.CENTER,0),P([T(data.tRut)],AlignmentType.CENTER,0),P([T("Trabajador")],AlignmentType.CENTER,0)]}),
+      ]}),
+    ]
+  });
+
+  const doc = new Document({ sections:[{
+    properties:{ page:{ size:{width:11906,height:16838}, margin:{top:1134,right:1134,bottom:1134,left:1134} } },
+    children:[
+      titulo("ANEXO DE CONTRATO DE TRABAJO"),
+      P([]),
+      P([T("En Nunoa, a "), T(hoy,{bold:true}), T(", entre "), T(emp.nombre,{bold:true}), T(", R.U.T. "+emp.rut+", representado por "+emp.rep+", cedula "+emp.repRut+", en adelante el Empleador, y don(a) "), T(data.tNombre,{bold:true}), T(", RUT "+data.tRut+", cargo: "+data.tCargo+", en adelante el Trabajador, se ha convenido el siguiente Anexo al Contrato de Trabajo:")], AlignmentType.JUSTIFIED, 120),
+      art("ARTICULO PRIMERO :", "Las partes acuerdan modificar el contrato de trabajo en los siguientes terminos: "+tiposMap[data.anTipo]+". "+data.anDesc),
+      art("ARTICULO SEGUNDO :", "Nueva condicion contractual: "+data.anCond+". Esta modificacion rige a partir de "+fmtF(data.anFecha)+"."),
+      art("ARTICULO TERCERO :", "En todo lo demas, las clausulas del contrato original permanecen vigentes e inalteradas, siendo este Anexo parte integrante del mismo."),
+      art("ARTICULO CUARTO :", "El presente Anexo se firma en dos ejemplares del mismo tenor y fecha, quedando uno en poder de cada contratante."),
+      P([T("")], AlignmentType.JUSTIFIED, 400),
+      tablaFirmas,
+    ]
+  }]});
+
+  const blob = await Packer.toBlob(doc);
+  saveAs(blob, "Anexo_"+data.tNombre.replace(" ","_")+"_"+data.anFecha+".docx");
+}
+
+// ── Generar Amonestacion Inasistencias ────────────────────────────────────────
+async function generarAmonInasistencia(data) {
+  const emp = EMP[data.empresa];
+  const doc = new Document({ sections:[{
+    properties:{ page:{ size:{width:11906,height:16838}, margin:{top:1134,right:1134,bottom:1134,left:1134} } },
+    children:[
+      titulo("CARTA DE AMONESTACION"),
+      P([T("Por Inasistencias Injustificadas",{bold:true})], AlignmentType.CENTER, 200),
+      P([T("Nunoa, "+fmtF(data.aiFecha))], AlignmentType.JUSTIFIED, 120),
+      P([T("Senor(a):")], AlignmentType.JUSTIFIED, 40),
+      P([T(data.tNombre,{bold:true})], AlignmentType.JUSTIFIED, 40),
+      P([T("Cargo: "+data.tCargo)], AlignmentType.JUSTIFIED, 40),
+      P([T("RUT: "+data.tRut)], AlignmentType.JUSTIFIED, 120),
+      P([T("Por medio de la presente, "+emp.nombre+", RUT "+emp.rut+", representada por "+emp.rep+", viene en amonestarlo(a) formalmente por las siguientes inasistencias:")], AlignmentType.JUSTIFIED, 80),
+      P([T("Fechas de inasistencia: "+data.aiDias,{bold:true})], AlignmentType.JUSTIFIED, 80),
+      P([T("Motivo o justificacion entregada por el trabajador: "+(data.aiMotivo||"Sin justificacion")+".")], AlignmentType.JUSTIFIED, 80),
+      P([T("Las inasistencias descritas constituyen una infraccion a las obligaciones establecidas en el Titulo VII, Articulo 27 del Reglamento Interno de Orden, Higiene y Seguridad (RIOSH) de la empresa, que dispone expresamente la obligacion de asistencia puntual y la comunicacion de toda inasistencia dentro de las primeras 24 horas.")], AlignmentType.JUSTIFIED, 80),
+      P([T(data.aiReinc ? "Dado que usted presenta reincidencia en este tipo de faltas, la presente amonestacion se emite con copia a la Inspeccion del Trabajo correspondiente, conforme a lo establecido en el Titulo XVII, Articulo 63 del RIOSH." : "La presente amonestacion se emite conforme a lo establecido en el Titulo XVII, Articulo 63 del Reglamento Interno de Orden, Higiene y Seguridad de la empresa.")], AlignmentType.JUSTIFIED, 80),
+      P([T("Se le hace presente que la reiteracion de este tipo de conductas podra ser considerada incumplimiento grave de las obligaciones que impone el contrato de trabajo, causal de termino contemplada en el Articulo 160 N7 del Codigo del Trabajo.")], AlignmentType.JUSTIFIED, 80),
+      P([T("El trabajador tiene derecho a formular sus descargos por escrito dentro del plazo de 3 dias habiles desde la recepcion de esta carta.")], AlignmentType.JUSTIFIED, 200),
+      P([T("Acuse de recibo:")], AlignmentType.JUSTIFIED, 300),
+      new Table({ width:{size:9360,type:WidthType.DXA}, columnWidths:[4680,4680], rows:[
+        new TableRow({children:[
+          new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:0,bottom:0,left:120,right:120},children:[P([T("_________________________________")],AlignmentType.CENTER,0),P([T(emp.rep,{bold:true})],AlignmentType.CENTER,0),P([T("Empleador")],AlignmentType.CENTER,0)]}),
+          new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:0,bottom:0,left:120,right:120},children:[P([T("_________________________________")],AlignmentType.CENTER,0),P([T(data.tNombre,{bold:true})],AlignmentType.CENTER,0),P([T("Trabajador / Fecha recepcion")],AlignmentType.CENTER,0)]}),
+        ]}),
+      ]}),
+    ]
+  }]});
+
+  const blob = await Packer.toBlob(doc);
+  saveAs(blob, "Amonestacion_Inasistencia_"+data.tNombre.replace(" ","_")+".docx");
+}
+
+// ── Generar Amonestacion Atrasos ──────────────────────────────────────────────
+async function generarAmonAtraso(data) {
+  const emp = EMP[data.empresa];
+  const doc = new Document({ sections:[{
+    properties:{ page:{ size:{width:11906,height:16838}, margin:{top:1134,right:1134,bottom:1134,left:1134} } },
+    children:[
+      titulo("CARTA DE AMONESTACION"),
+      P([T("Por Atrasos Reiterados",{bold:true})], AlignmentType.CENTER, 200),
+      P([T("Nunoa, "+fmtF(data.aaFecha))], AlignmentType.JUSTIFIED, 120),
+      P([T("Senor(a):")], AlignmentType.JUSTIFIED, 40),
+      P([T(data.tNombre,{bold:true})], AlignmentType.JUSTIFIED, 40),
+      P([T("Cargo: "+data.tCargo)], AlignmentType.JUSTIFIED, 40),
+      P([T("RUT: "+data.tRut)], AlignmentType.JUSTIFIED, 120),
+      P([T("Por medio de la presente, "+emp.nombre+", RUT "+emp.rut+", representada por "+emp.rep+", viene en amonestarlo(a) formalmente por los siguientes atrasos registrados:")], AlignmentType.JUSTIFIED, 80),
+      P([T(data.aaDetalle,{bold:true})], AlignmentType.JUSTIFIED, 80),
+      P([T("Los atrasos descritos constituyen una infraccion a las obligaciones establecidas en el Titulo VII, Articulo 27 del RIOSH de la empresa y a lo pactado en el contrato de trabajo. Conforme a la tabla de multas del Titulo XVII, Articulo 63 del RIOSH: "+RIOSH_TABLA_ATRASOS)], AlignmentType.JUSTIFIED, 80),
+      P([T(data.aaReinc ? "Dado que usted presenta reincidencia en atrasos, la presente amonestacion se emite con copia a la Inspeccion del Trabajo correspondiente, conforme al Titulo XVII Art. 63 del RIOSH." : "La presente amonestacion se emite conforme al Titulo XVII, Articulo 63 del Reglamento Interno de Orden, Higiene y Seguridad.")], AlignmentType.JUSTIFIED, 80),
+      P([T("Se le hace presente que conforme al Articulo 160 N7 del Codigo del Trabajo y lo pactado en su contrato, llegar atrasado 7 o mas dias en un mismo mes calendario sera considerado incumplimiento grave de las obligaciones contractuales, causal suficiente para poner termino al contrato sin derecho a indemnizacion.")], AlignmentType.JUSTIFIED, 80),
+      P([T("El trabajador tiene derecho a formular sus descargos por escrito dentro del plazo de 3 dias habiles desde la recepcion de esta carta.")], AlignmentType.JUSTIFIED, 200),
+      P([T("Acuse de recibo:")], AlignmentType.JUSTIFIED, 300),
+      new Table({ width:{size:9360,type:WidthType.DXA}, columnWidths:[4680,4680], rows:[
+        new TableRow({children:[
+          new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:0,bottom:0,left:120,right:120},children:[P([T("_________________________________")],AlignmentType.CENTER,0),P([T(emp.rep,{bold:true})],AlignmentType.CENTER,0),P([T("Empleador")],AlignmentType.CENTER,0)]}),
+          new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:0,bottom:0,left:120,right:120},children:[P([T("_________________________________")],AlignmentType.CENTER,0),P([T(data.tNombre,{bold:true})],AlignmentType.CENTER,0),P([T("Trabajador / Fecha recepcion")],AlignmentType.CENTER,0)]}),
+        ]}),
+      ]}),
+    ]
+  }]});
+
+  const blob = await Packer.toBlob(doc);
+  saveAs(blob, "Amonestacion_Atraso_"+data.tNombre.replace(" ","_")+".docx");
+}
+
+// ── Generar No Renovacion ─────────────────────────────────────────────────────
+async function generarNoRenovacion(data) {
+  const emp = EMP[data.empresa];
+  const doc = new Document({ sections:[{
+    properties:{ page:{ size:{width:11906,height:16838}, margin:{top:1134,right:1134,bottom:1134,left:1134} } },
+    children:[
+      titulo("CARTA DE NO RENOVACION DE CONTRATO"),
+      P([]),
+      P([T("Nunoa, "+fmtF(data.nrFechaDoc))], AlignmentType.JUSTIFIED, 120),
+      P([T("Senor(a):")], AlignmentType.JUSTIFIED, 40),
+      P([T(data.tNombre,{bold:true})], AlignmentType.JUSTIFIED, 40),
+      P([T("Cargo: "+data.tCargo)], AlignmentType.JUSTIFIED, 40),
+      P([T("RUT: "+data.tRut)], AlignmentType.JUSTIFIED, 120),
+      P([T("Por medio de la presente, "+emp.nombre+", R.U.T. "+emp.rut+", domiciliada en "+emp.dom+", representada por "+emp.rep+", cedula "+emp.repRut+", viene en notificarle formalmente que el contrato de trabajo a plazo fijo que lo une con esta empresa NO sera renovado al vencimiento del plazo convenido.")], AlignmentType.JUSTIFIED, 80),
+      P([T("El contrato de trabajo terminara definitivamente el dia "+fmtF(data.nrFechaTermino)+", fecha en que se cumple el plazo estipulado, conforme a lo establecido en el Articulo 159 N4 del Codigo del Trabajo, que dispone que el contrato de trabajo termina por vencimiento del plazo convenido.")], AlignmentType.JUSTIFIED, 80),
+      data.nrMotivo ? P([T("Motivo de la no renovacion: "+data.nrMotivo+".")], AlignmentType.JUSTIFIED, 80) : P([]),
+      P([T("La empresa se compromete a tener al dia todas las cotizaciones previsionales y de salud a la fecha del termino del contrato, y a suscribir el finiquito correspondiente en la oportunidad legal.")], AlignmentType.JUSTIFIED, 80),
+      P([T("Se le solicita hacer entrega de todos los elementos, herramientas, uniformes y accesorios de propiedad de la empresa que se encuentren en su poder, a mas tardar el dia del termino del contrato.")], AlignmentType.JUSTIFIED, 200),
+      P([T("Acuse de recibo de la presente notificacion:")], AlignmentType.JUSTIFIED, 300),
+      new Table({ width:{size:9360,type:WidthType.DXA}, columnWidths:[4680,4680], rows:[
+        new TableRow({children:[
+          new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:0,bottom:0,left:120,right:120},children:[P([T("_________________________________")],AlignmentType.CENTER,0),P([T(emp.rep,{bold:true})],AlignmentType.CENTER,0),P([T("Empleador")],AlignmentType.CENTER,0)]}),
+          new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:0,bottom:0,left:120,right:120},children:[P([T("_________________________________")],AlignmentType.CENTER,0),P([T(data.tNombre,{bold:true})],AlignmentType.CENTER,0),P([T("Trabajador / Fecha recepcion")],AlignmentType.CENTER,0)]}),
+        ]}),
+      ]}),
+    ]
+  }]});
+
+  const blob = await Packer.toBlob(doc);
+  saveAs(blob, "No_Renovacion_"+data.tNombre.replace(" ","_")+".docx");
+}
+
+// ── Estilos ───────────────────────────────────────────────────────────────────
+const S = {
+  inp:  { width:"100%", padding:"10px", border:"1px solid #e0e0db", borderRadius:8, fontSize:16, color:"#1a1a1a", outline:"none", boxSizing:"border-box", WebkitAppearance:"none" },
+  sel:  { width:"100%", padding:"10px", border:"1px solid #e0e0db", borderRadius:8, fontSize:16, color:"#1a1a1a", background:"white", boxSizing:"border-box", WebkitAppearance:"none" },
+  ta:   { width:"100%", padding:"10px", border:"1px solid #e0e0db", borderRadius:8, fontSize:14, color:"#1a1a1a", resize:"vertical", minHeight:80, fontFamily:"inherit", boxSizing:"border-box" },
+  lbl:  { fontSize:13, color:"#555", display:"block", marginBottom:5, marginTop:14 },
+  card: { background:"white", border:"1px solid #e8e8e5", borderRadius:12, padding:"1.1rem", marginBottom:"1rem" },
+  btnP: { background:"#185FA5", color:"white", border:"none", width:"100%", padding:14, borderRadius:8, fontSize:16, cursor:"pointer", fontWeight:700, marginTop:10 },
+  r2:   { display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 },
+  aE:   { padding:"10px 14px", borderRadius:8, fontSize:13, marginTop:8, background:"#FCEBEB", color:"#A32D2D" },
+  aS:   { padding:"10px 14px", borderRadius:8, fontSize:13, marginTop:8, background:"#E1F5EE", color:"#0F6E56" },
+};
+const pill = (a) => ({ padding:"8px 16px", borderRadius:20, fontSize:13, cursor:"pointer", border:a?"1px solid #185FA5":"1px solid #e0e0db", background:a?"#185FA5":"white", color:a?"white":"#1a1a1a", fontWeight:a?600:400 });
+const dtcSt = (a) => ({ padding:"10px 6px", border:a?"2px solid #185FA5":"1px solid #e0e0db", borderRadius:10, cursor:"pointer", textAlign:"center", background:a?"#EBF3FF":"white" });
+
+function LBL({children, first}) { return <label style={{...S.lbl, marginTop:first?0:14}}>{children}</label>; }
+function FormTrabSimple({nombre, onNombre, rut, onRut, cargo, onCargo}) {
+  return (
+    <div style={S.card}>
+      <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Datos del trabajador</div>
+      <div style={S.r2}>
+        <div><LBL first>Nombre y apellido</LBL><input style={S.inp} value={nombre} onChange={e=>onNombre(e.target.value)} placeholder="Juan Perez"/></div>
+        <div><LBL first>RUT</LBL><input style={S.inp} value={rut} onChange={e=>onRut(e.target.value)} placeholder="12.345.678-9"/></div>
+      </div>
+      <LBL>Cargo</LBL><input style={S.inp} value={cargo} onChange={e=>onCargo(e.target.value)} placeholder="Garzon - Barista"/>
+    </div>
+  );
+}
+function FormPF({value, onChange}) {
+  const u = useCallback((k,val) => onChange(p=>({...p,[k]:val})), [onChange]);
+  return (
+    <div style={S.card}>
+      <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Datos del trabajador</div>
+      <div style={S.r2}>
+        <div><LBL first>Nombre</LBL><input style={S.inp} value={value.nombre} onChange={e=>u("nombre",e.target.value)} placeholder="Nombre"/></div>
+        <div><LBL first>Apellido(s)</LBL><input style={S.inp} value={value.apellido} onChange={e=>u("apellido",e.target.value)} placeholder="Apellidos"/></div>
+      </div>
+      <div style={S.r2}>
+        <div><LBL>RUT</LBL><input style={S.inp} value={value.rut} onChange={e=>u("rut",e.target.value)} placeholder="12.345.678-9"/></div>
+        <div><LBL>Nacionalidad</LBL><input style={S.inp} value={value.nac} onChange={e=>u("nac",e.target.value)}/></div>
+      </div>
+      <div style={S.r2}>
+        <div><LBL>Fecha nac.</LBL><input style={S.inp} type="date" value={value.nacF} onChange={e=>u("nacF",e.target.value)}/></div>
+        <div><LBL>Estado civil</LBL>
+          <select style={S.sel} value={value.civil} onChange={e=>u("civil",e.target.value)}>
+            {["Soltero(a)","Casado(a)","Divorciado(a)","Viudo(a)"].map(o=><option key={o}>{o}</option>)}
+          </select>
+        </div>
+      </div>
+      <LBL>Calle</LBL><input style={S.inp} value={value.calle} onChange={e=>u("calle",e.target.value)} placeholder="Av. Ejemplo"/>
+      <div style={S.r2}>
+        <div><LBL>Numero</LBL><input style={S.inp} value={value.num} onChange={e=>u("num",e.target.value)} placeholder="123"/></div>
+        <div><LBL>Comuna</LBL><input style={S.inp} value={value.comuna} onChange={e=>u("comuna",e.target.value)} placeholder="Nunoa"/></div>
+      </div>
+      <LBL>Ciudad</LBL><input style={S.inp} value={value.ciudad} onChange={e=>u("ciudad",e.target.value)} placeholder="Santiago"/>
+      <div style={S.r2}>
+        <div><LBL>Email</LBL><input style={S.inp} value={value.email} onChange={e=>u("email",e.target.value)} placeholder="correo@gmail.com"/></div>
+        <div><LBL>Telefono</LBL><input style={S.inp} value={value.tel} onChange={e=>u("tel",e.target.value)} placeholder="9XXXXXXXX"/></div>
+      </div>
+      <div style={S.r2}>
+        <div><LBL>Banco</LBL><input style={S.inp} value={value.banco} onChange={e=>u("banco",e.target.value)} placeholder="Banco Estado"/></div>
+        <div><LBL>N cuenta</LBL><input style={S.inp} value={value.cuenta} onChange={e=>u("cuenta",e.target.value)} placeholder="0000000"/></div>
+      </div>
+      <LBL>Tipo cuenta</LBL>
+      <select style={S.sel} value={value.tipoCuenta} onChange={e=>u("tipoCuenta",e.target.value)}>
+        {["Cuenta Rut","Cuenta Vista","Cuenta Corriente","Cuenta de Ahorro"].map(o=><option key={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+
+export default function App() {
+  const today = new Date().toISOString().split("T")[0];
+  const [docTab, setDocTab] = useState("plazo_fijo");
+  const [empresa, setEmpresa] = useState("Malvarrosa SpA");
+  const [alert, setAlert] = useState({t:"",m:""});
+  const [loading, setLoading] = useState(false);
+
+  const [pf, setPf] = useState({nombre:"",apellido:"",rut:"",nac:"Chilena",nacF:"",civil:"Soltero(a)",calle:"",num:"",comuna:"",ciudad:"",email:"",tel:"",banco:"",cuenta:"",tipoCuenta:"Cuenta Rut"});
+  const [inicio, setInicio] = useState(today);
+  const [termino, setTermino] = useState(today);
+  const [cargoKey, setCargoKey] = useState("");
+  const [cargoOtro, setCargoOtro] = useState("");
+  const [funciones, setFunciones] = useState("");
+  const [horas, setHoras] = useState(30);
+  const [colacion, setColacion] = useState(30);
+  const [sueldo, setSueldo] = useState(385000);
+  const [turno, setTurno] = useState(DIAS_C.map(()=>({on:false,e:"",s:""})));
+  const updTurno = useCallback((i,k,val)=>setTurno(p=>p.map((r,j)=>j===i?{...r,[k]:val}:r)),[]);
+
+  const [tNombre, setTNombre] = useState("");
+  const [tRut, setTRut] = useState("");
+  const [tCargo, setTCargo] = useState("");
+
+  const [anFecha, setAnFecha] = useState(today);
+  const [anTipo, setAnTipo] = useState("plazo");
+  const [anDesc, setAnDesc] = useState("");
+  const [anCond, setAnCond] = useState("");
+
+  const [aiFecha, setAiFecha] = useState(today);
+  const [aiDias, setAiDias] = useState("");
+  const [aiMotivo, setAiMotivo] = useState("");
+  const [aiReinc, setAiReinc] = useState(false);
+
+  const [aaFecha, setAaFecha] = useState(today);
+  const [aaDetalle, setAaDetalle] = useState("");
+  const [aaReinc, setAaReinc] = useState(false);
+
+  const [nrFechaDoc, setNrFechaDoc] = useState(today);
+  const [nrFechaTermino, setNrFechaTermino] = useState(today);
+  const [nrMotivo, setNrMotivo] = useState("");
+
+  const getCargoN = () => {
+    if (cargoKey==="garzon") return "Garzon - Barista";
+    if (cargoKey==="cocina") return "Personal de Cocina y Produccion";
+    if (cargoKey==="operario") return "Operario Multifuncional de Almacen y Alimentos al Paso";
+    return cargoOtro;
+  };
+
+  const generar = async () => {
+    setLoading(true); setAlert({t:"",m:""});
+    try {
+      if (docTab==="plazo_fijo") {
+        if (!pf.nombre||!pf.apellido) throw new Error("Ingresa nombre y apellido");
+        if (!getCargoN()) throw new Error("Selecciona un cargo");
+        await generarContratoPF({...pf, empresa, inicio, termino, horas, colacion, sueldo, turno, funciones, cargo:getCargoN()});
+      } else if (docTab==="anexo") {
+        if (!tNombre) throw new Error("Ingresa el nombre del trabajador");
+        if (!anDesc) throw new Error("Describe el cambio");
+        await generarAnexo({empresa, tNombre, tRut, tCargo, anFecha, anTipo, anDesc, anCond});
+      } else if (docTab==="am_inasistencia") {
+        if (!tNombre) throw new Error("Ingresa el nombre del trabajador");
+        if (!aiDias) throw new Error("Ingresa las fechas de inasistencia");
+        await generarAmonInasistencia({empresa, tNombre, tRut, tCargo, aiFecha, aiDias, aiMotivo, aiReinc});
+      } else if (docTab==="am_atraso") {
+        if (!tNombre) throw new Error("Ingresa el nombre del trabajador");
+        if (!aaDetalle) throw new Error("Ingresa el detalle de los atrasos");
+        await generarAmonAtraso({empresa, tNombre, tRut, tCargo, aaFecha, aaDetalle, aaReinc});
+      } else if (docTab==="no_renovacion") {
+        if (!tNombre) throw new Error("Ingresa el nombre del trabajador");
+        await generarNoRenovacion({empresa, tNombre, tRut, tCargo, nrFechaDoc, nrFechaTermino, nrMotivo});
+      }
+      setAlert({t:"s", m:"Documento generado y descargado correctamente."});
+    } catch(e) {
+      setAlert({t:"e", m:"Error: "+e.message});
+    }
+    setLoading(false);
+  };
+
+  const DOC_TYPES = [
+    ["plazo_fijo","📅","Contrato PF"],
+    ["anexo","📄","Anexo"],
+    ["am_inasistencia","🗓️","Amonest. inasist."],
+    ["am_atraso","⏰","Amonest. atrasos"],
+    ["no_renovacion","🚫","No renovacion"],
+  ];
+
+  return (
+    <div style={{maxWidth:480,margin:"0 auto",background:"#f5f5f0",minHeight:"100vh",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
+      <div style={{background:"#185FA5",color:"white",padding:"1rem 1.2rem",display:"flex",alignItems:"center",gap:10,position:"sticky",top:0,zIndex:10}}>
+        <div style={{fontSize:22}}>📄</div>
+        <div>
+          <div style={{fontSize:16,fontWeight:700}}>Documentos Laborales</div>
+          <div style={{fontSize:11,opacity:.8}}>Malvarrosa SpA · Eric Hansen EIRL</div>
+        </div>
+      </div>
+
+      <div style={{padding:"1rem 1rem 4rem"}}>
+        <div style={S.card}>
+          <div style={{fontSize:14,fontWeight:700,marginBottom:10,color:"#444"}}>Empresa</div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {["Malvarrosa SpA","Eric Hansen EIRL"].map(e=>(
+              <button key={e} style={pill(empresa===e)} onClick={()=>setEmpresa(e)}>{e}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={S.card}>
+          <div style={{fontSize:14,fontWeight:700,marginBottom:10,color:"#444"}}>Tipo de documento</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+            {DOC_TYPES.map(([k,ico,lbl])=>(
+              <div key={k} style={dtcSt(docTab===k)} onClick={()=>{setDocTab(k);setAlert({t:"",m:""});}}>
+                <div style={{fontSize:18,marginBottom:3}}>{ico}</div>
+                <div style={{fontSize:10,color:docTab===k?"#185FA5":"#666",fontWeight:docTab===k?600:400,lineHeight:1.3}}>{lbl}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {docTab==="plazo_fijo" && <>
+          <FormPF value={pf} onChange={setPf}/>
+          <div style={S.card}>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Condiciones del contrato</div>
+            <div style={S.r2}>
+              <div><LBL first>Fecha inicio</LBL><input style={S.inp} type="date" value={inicio} onChange={e=>setInicio(e.target.value)}/></div>
+              <div><LBL first>Fecha termino</LBL><input style={S.inp} type="date" value={termino} onChange={e=>setTermino(e.target.value)}/></div>
+            </div>
+            <LBL>Cargo</LBL>
+            <select style={S.sel} value={cargoKey} onChange={e=>{const k=e.target.value;setCargoKey(k);setFunciones(FN[k]||"");}}>
+              <option value="">-- Selecciona un cargo --</option>
+              <option value="garzon">Garzon - Barista</option>
+              <option value="cocina">Personal de Cocina y Produccion</option>
+              <option value="operario">Operario Multifuncional de Almacen y Alimentos al Paso</option>
+              <option value="otro">Otro</option>
+            </select>
+            {cargoKey==="otro"&&<><LBL>Nombre del cargo</LBL><input style={S.inp} value={cargoOtro} onChange={e=>setCargoOtro(e.target.value)} placeholder="Ej: Cajero"/></>}
+            <LBL>Funciones <span style={{color:"#999",fontSize:11}}>(editable)</span></LBL>
+            <textarea style={S.ta} value={funciones} onChange={e=>setFunciones(e.target.value)} placeholder="Selecciona un cargo..."/>
+            <LBL>Lugar de trabajo</LBL>
+            <input style={{...S.inp,background:"#f5f5f0",color:"#666"}} value={getLugar(empresa)} readOnly/>
+            <LBL>Jornada semanal</LBL>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {[[42,"42 hrs"],[30,"30 hrs"],[20,"20 hrs"]].map(([h,lbl])=>(
+                <button key={h} style={pill(horas===h)} onClick={()=>{setHoras(h);setSueldo(SUELDOS[h]);}}>{lbl}</button>
+              ))}
+            </div>
+            <LBL>Colacion</LBL>
+            <div style={{display:"flex",gap:8}}>
+              {[[30,"30 min"],[60,"1 hora"]].map(([m,lbl])=>(
+                <button key={m} style={pill(colacion===m)} onClick={()=>setColacion(m)}>{lbl}</button>
+              ))}
+            </div>
+            <LBL>Sueldo base mensual</LBL>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <input style={{...S.inp,flex:1}} type="number" value={sueldo} onChange={e=>setSueldo(parseInt(e.target.value)||0)}/>
+              <span style={{background:"#EBF3FF",color:"#185FA5",padding:"5px 12px",borderRadius:20,fontWeight:700,fontSize:13,whiteSpace:"nowrap"}}>${sueldo.toLocaleString("es-CL")}</span>
+            </div>
+            <div style={{fontSize:11,color:"#999",marginTop:4}}>42h=$539.000 | 30h=$385.000 | 20h=$256.667</div>
+            <LBL>Horario semanal</LBL>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+              <thead><tr>{["Dia","","Entrada","Salida"].map((h,i)=><th key={i} style={{background:"#f5f5f0",padding:"6px 4px",textAlign:"center",border:"1px solid #e8e8e5",color:"#888",fontWeight:500}}>{h}</th>)}</tr></thead>
+              <tbody>{DIAS_C.map((d,i)=>(
+                <tr key={i} style={{background:turno[i].on?"white":"#fafaf8"}}>
+                  <td style={{padding:"4px 6px",border:"1px solid #e8e8e5",fontWeight:600,color:turno[i].on?"#185FA5":"#bbb",textAlign:"center",fontSize:12}}>{d}</td>
+                  <td style={{padding:4,border:"1px solid #e8e8e5",textAlign:"center"}}><input type="checkbox" checked={turno[i].on} onChange={ev=>updTurno(i,"on",ev.target.checked)} style={{width:18,height:18,cursor:"pointer",accentColor:"#185FA5"}}/></td>
+                  <td style={{padding:3,border:"1px solid #e8e8e5"}}><input value={turno[i].e} onChange={ev=>updTurno(i,"e",ev.target.value)} placeholder="09:00" disabled={!turno[i].on} style={{border:"none",background:"transparent",color:turno[i].on?"#1a1a1a":"#ccc",padding:"4px",width:"100%",fontSize:13,textAlign:"center",outline:"none"}}/></td>
+                  <td style={{padding:3,border:"1px solid #e8e8e5"}}><input value={turno[i].s} onChange={ev=>updTurno(i,"s",ev.target.value)} placeholder="18:00" disabled={!turno[i].on} style={{border:"none",background:"transparent",color:turno[i].on?"#1a1a1a":"#ccc",padding:"4px",width:"100%",fontSize:13,textAlign:"center",outline:"none"}}/></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        </>}
+
+        {docTab==="anexo" && <>
+          <FormTrabSimple nombre={tNombre} onNombre={setTNombre} rut={tRut} onRut={setTRut} cargo={tCargo} onCargo={setTCargo}/>
+          <div style={S.card}>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Datos del anexo</div>
+            <LBL first>Fecha del anexo</LBL><input style={S.inp} type="date" value={anFecha} onChange={e=>setAnFecha(e.target.value)}/>
+            <LBL>Tipo de modificacion</LBL>
+            <select style={S.sel} value={anTipo} onChange={e=>setAnTipo(e.target.value)}>
+              <option value="plazo">Prorroga de plazo fijo</option>
+              <option value="indefinido">Conversion a indefinido (Art.159 N4 CT)</option>
+              <option value="sueldo">Cambio de sueldo</option>
+              <option value="cargo">Cambio de cargo</option>
+              <option value="horario">Cambio de horario</option>
+              <option value="otro">Otro</option>
+            </select>
+            <LBL>Descripcion del cambio</LBL>
+            <textarea style={S.ta} value={anDesc} onChange={e=>setAnDesc(e.target.value)} placeholder="Describe que cambia..."/>
+            <LBL>Nueva condicion contractual</LBL>
+            <textarea style={S.ta} value={anCond} onChange={e=>setAnCond(e.target.value)} placeholder="Ej: A partir del [fecha], la jornada sera de..."/>
+          </div>
+        </>}
+
+        {docTab==="am_inasistencia" && <>
+          <FormTrabSimple nombre={tNombre} onNombre={setTNombre} rut={tRut} onRut={setTRut} cargo={tCargo} onCargo={setTCargo}/>
+          <div style={S.card}>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Amonestacion por inasistencias</div>
+            <LBL first>Fecha de la carta</LBL><input style={S.inp} type="date" value={aiFecha} onChange={e=>setAiFecha(e.target.value)}/>
+            <LBL>Dias de inasistencia (fechas exactas)</LBL>
+            <input style={S.inp} value={aiDias} onChange={e=>setAiDias(e.target.value)} placeholder="Ej: 12, 13 y 15 de mayo de 2026"/>
+            <LBL>Motivo o justificacion entregada</LBL>
+            <textarea style={S.ta} value={aiMotivo} onChange={e=>setAiMotivo(e.target.value)} placeholder="Sin justificacion / El trabajador indico que..."/>
+            <LBL>Reincidencia</LBL>
+            <div style={{display:"flex",gap:8,marginTop:6}}>
+              <button style={pill(!aiReinc)} onClick={()=>setAiReinc(false)}>No — primera vez</button>
+              <button style={pill(aiReinc)} onClick={()=>setAiReinc(true)}>Si — reincidente</button>
+            </div>
+          </div>
+        </>}
+
+        {docTab==="am_atraso" && <>
+          <FormTrabSimple nombre={tNombre} onNombre={setTNombre} rut={tRut} onRut={setTRut} cargo={tCargo} onCargo={setTCargo}/>
+          <div style={S.card}>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Amonestacion por atrasos</div>
+            <LBL first>Fecha de la carta</LBL><input style={S.inp} type="date" value={aaFecha} onChange={e=>setAaFecha(e.target.value)}/>
+            <LBL>Detalle de los atrasos</LBL>
+            <textarea style={S.ta} value={aaDetalle} onChange={e=>setAaDetalle(e.target.value)} placeholder="Ej: 12/05 llegada 09:20 (20 min), 14/05 llegada 09:35 (35 min)"/>
+            <LBL>Reincidencia</LBL>
+            <div style={{display:"flex",gap:8,marginTop:6}}>
+              <button style={pill(!aaReinc)} onClick={()=>setAaReinc(false)}>No — primera vez</button>
+              <button style={pill(aaReinc)} onClick={()=>setAaReinc(true)}>Si — reincidente</button>
+            </div>
+          </div>
+        </>}
+
+        {docTab==="no_renovacion" && <>
+          <FormTrabSimple nombre={tNombre} onNombre={setTNombre} rut={tRut} onRut={setTRut} cargo={tCargo} onCargo={setTCargo}/>
+          <div style={S.card}>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Carta de no renovacion</div>
+            <div style={{background:"#FFF3E0",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#E65100",marginBottom:14,border:"1px solid #FFB74D"}}>Art. 159 N4 CT — Notificacion formal de que el contrato a plazo fijo NO sera renovado.</div>
+            <div style={S.r2}>
+              <div><LBL first>Fecha del documento</LBL><input style={S.inp} type="date" value={nrFechaDoc} onChange={e=>setNrFechaDoc(e.target.value)}/></div>
+              <div><LBL first>Fecha termino contrato</LBL><input style={S.inp} type="date" value={nrFechaTermino} onChange={e=>setNrFechaTermino(e.target.value)}/></div>
+            </div>
+            <LBL>Motivo <span style={{color:"#999",fontSize:11}}>(opcional)</span></LBL>
+            <textarea style={S.ta} value={nrMotivo} onChange={e=>setNrMotivo(e.target.value)} placeholder="Ej: Necesidades operacionales, termino de proyecto..."/>
+          </div>
+        </>}
+
+        <button style={{...S.btnP,opacity:loading?0.7:1}} onClick={generar} disabled={loading}>
+          {loading?"⏳ Generando...":"⬇️ Generar y descargar documento"}
+        </button>
+        {alert.m && <div style={alert.t==="e"?S.aE:S.aS}>{alert.m}</div>}
+      </div>
+    </div>
+  );
+}
