@@ -431,7 +431,8 @@ async function generarAnexo(data) {
   }]});
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, "Anexo_"+data.tApellido+"_"+data.tNombre+"_"+data.anFecha+".docx");
+  const tipoNombre = data.anTipo==="plazo"?"Renovacion_Plazo_Fijo": data.anTipo==="indefinido"?"Contrato_Indefinido": data.anTipo==="horario"?"Cambio_Horario":"Anexo";
+  saveAs(blob, "Anexo_"+tipoNombre+"_"+data.tApellido+"_"+data.tNombre+"_"+data.anFecha+".docx");
 }
 
 
@@ -1068,7 +1069,7 @@ export default function App() {
           <div style={S.card}>
             <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Tipo de anexo</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
-              {[["plazo","🔄","Renovacion plazo fijo"],["indefinido","♾️","Conversion indefinido"],["horario","🕐","Cambio de horario"]].map(([k,ico,lbl])=>(
+              {[["plazo","🔄","Renovacion plazo fijo"],["indefinido","♾️","Contrato indefinido"],["horario","🕐","Cambio de horario"]].map(([k,ico,lbl])=>(
                 <div key={k} style={dtcSt(anTipo===k)} onClick={()=>setAnTipo(k)}>
                   <div style={{fontSize:18,marginBottom:3}}>{ico}</div>
                   <div style={{fontSize:10,color:anTipo===k?"#185FA5":"#666",fontWeight:anTipo===k?600:400,lineHeight:1.3}}>{lbl}</div>
