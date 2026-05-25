@@ -132,7 +132,7 @@ async function generarContratoPF(data) {
   const entradas = DIAS_F.map((d,i) => { const r=data.turno[i]; return r.on&&r.e ? r.e : "00:00"; });
   const salidas1 = DIAS_F.map((d,i) => { const r=data.turno[i]; if (!r.on||!r.e||!r.s) return "00:00"; return calcBreak(r.e,r.s,data.colacion); });
   const breaks  = DIAS_F.map((d,i) => { const r=data.turno[i]; if (!r.on) return "00:00"; return String(Math.floor(data.colacion/60)).padStart(2,"0")+":"+String(data.colacion%60).padStart(2,"0"); });
-  const entradas2= DIAS_F.map((d,i) => { const r=data.turno[i]; if (!r.on||!r.e||!r.s) return "00:00"; const br=calcBreak(r.e,r.s,data.colacion); const [bh,bm]=br.split(":").map(Number); const [e1h,e1m]=salidas1[i].split(":").map(Number); const t=e1h*60+e1m+bh*60+bm; return String(Math.floor(t/60)).padStart(2,"0")+":"+String(t%60).padStart(2,"0"); });
+  const entradas2= DIAS_F.map((d,i) => { const r=data.turno[i]; if (!r.on||!r.e||!r.s) return "00:00"; const [s1h,s1m]=salidas1[i].split(":").map(Number); const t=s1h*60+s1m+data.colacion; return String(Math.floor(t/60)).padStart(2,"0")+":"+String(t%60).padStart(2,"0"); });
   const salidas2 = DIAS_F.map((d,i) => { const r=data.turno[i]; return r.on&&r.s ? r.s : "00:00"; });
 
   const tablaJornada = new Table({
