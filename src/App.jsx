@@ -54,6 +54,21 @@ function calcBreak(e, s, col) {
   const mid=Math.round((eM+sM)/2)-Math.floor(col/2);
   return String(Math.floor(mid/60)).padStart(2,"0")+":"+String(mid%60).padStart(2,"0");
 }
+function fmtRut(rut) {
+  // Limpia todo excepto números y k/K
+  let clean = rut.replace(/[^0-9kK]/g, "");
+  if (clean.length < 2) return clean;
+  const dv = clean.slice(-1);
+  const num = clean.slice(0, -1);
+  // Agrega puntos cada 3 dígitos
+  let formatted = "";
+  for (let i = 0; i < num.length; i++) {
+    if (i > 0 && (num.length - i) % 3 === 0) formatted += ".";
+    formatted += num[i];
+  }
+  return formatted + "-" + dv;
+}
+
 function getLugar(emp) {
   return emp==="Malvarrosa SpA" ? "Casa Turquesa, Av. Ortuzar 250, Nunoa, Santiago" : "Av. Ossa 1624, Nunoa, Santiago";
 }
@@ -196,12 +211,10 @@ async function generarContratoPF(data) {
       art("SEPTIMO :", "El trabajador se obliga y compromete expresamente a cumplir las instrucciones que le sean impartidas por su jefe inmediato o por la Gerencia de la empresa y a acatar en todas sus partes las disposiciones establecidas en el Reglamento de Orden, Higiene y Seguridad, las que declara conocer y que se consideran parte integrante del presente contrato, reglamento del cual el trabajador recibe un ejemplar en este acto."),
       art("OCTAVO :", "Las partes acuerdan que los atrasos reiterados, sin causa justificada, se consideraran incumplimiento grave de las obligaciones que impone el presente contrato y daran lugar a la aplicacion de la caducidad del contrato, contemplada en el Art. 160 N7 del Codigo del Trabajo. Se entendera por atraso reiterado el llegar despues de la hora de ingreso durante 7 dias maximos, seguidos o no, en cada mes calendario."),
       art("NOVENO :", "El presente contrato comenzara el "+fmtF(data.inicio)+" y tendra duracion hasta el dia "+fmtF(data.termino)+", y cualquiera de las partes podra ponerle termino."),
-      art("DECIMO :", "Para todas las cuestiones a que eventualmente pueda dar origen este contrato, las partes fijan domicilio en la ciudad de Nunoa."),
+      art("DECIMO :", "Para todas las cuestiones a que eventualmente pueda dar origen este contrato, las partes fijan domicilio en la comuna de Nunoa."),
       art("DECIMO PRIMERO :", "Todas las recetas, preparaciones, fichas tecnicas, procesos productivos, formulas y creaciones desarrolladas por el trabajador en el ejercicio de sus funciones seran de propiedad exclusiva del Empleador. El trabajador se obliga a no divulgar, reproducir ni utilizar dicha informacion fuera de la empresa, ni durante ni despues de la vigencia del presente contrato."),
-      art("DECIMO SEGUNDO :", "Se deja constancia que el Empleado ingreso al servicio de la Empresa con fecha "+fmtF(data.inicio)+". El presente contrato se firma en dos ejemplares, quedando en este mismo acto uno en poder de cada contratante."),
-      new Paragraph({ children:[new TextRun({text:"", break:1})], pageBreakBefore:true }),
-      titulo("CONTRATO DE TRABAJO"),
-      P([T("cada contratante.")], AlignmentType.JUSTIFIED, 400),
+      art("DECIMO SEGUNDO :", "Se deja constancia que el Empleado ingreso al servicio de la Empresa con fecha "+fmtF(data.inicio)+". El presente contrato se firma en dos ejemplares del mismo tenor y fecha, quedando uno en poder de cada parte."),
+      P([T("")], AlignmentType.JUSTIFIED, 200),
       tablaFirmas,
     ]
   }]});
@@ -386,7 +399,7 @@ function FormPF({value, onChange}) {
         <div><LBL first>Apellido(s)</LBL><input style={S.inp} value={value.apellido} onChange={e=>u("apellido",e.target.value)} placeholder="Apellidos"/></div>
       </div>
       <div style={S.r2}>
-        <div><LBL>RUT</LBL><input style={S.inp} value={value.rut} onChange={e=>u("rut",e.target.value)} placeholder="12.345.678-9"/></div>
+        <div><LBL>RUT</LBL><input style={S.inp} value={value.rut} onChange={e=>u("rut",fmtRut(e.target.value))} placeholder="12.345.678-9"/></div>
         <div><LBL>Nacionalidad</LBL><input style={S.inp} value={value.nac} onChange={e=>u("nac",e.target.value)}/></div>
       </div>
       <div style={S.r2}>
