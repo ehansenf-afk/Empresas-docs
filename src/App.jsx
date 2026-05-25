@@ -731,10 +731,18 @@ export default function App() {
   const [tApellido, setTApellido] = useState("");
   const [tRut, setTRut] = useState("");
   const [tCargo, setTCargo] = useState("");
-  const [tDom, setTDom] = useState("");
+  const [tCargoKey, setTCargoKey] = useState("");
+  const [tCargoOtro, setTCargoOtro] = useState("");
+  const [tCalle, setTCalle] = useState("");
+  const [tNum, setTNum] = useState("");
+  const [tDepto, setTDepto] = useState("");
+  const [tComuna, setTComuna] = useState("");
+  const [tCiudad, setTCiudad] = useState("");
   const [tNac, setTNac] = useState("Chilena");
   const [tCivil, setTCivil] = useState("Soltero(a)");
   const [tIdSheet, setTIdSheet] = useState("");
+  const getTDom = () => { const dir=[tCalle, tNum, tDepto].filter(Boolean).join(" "); return dir+(tComuna?(" "+tComuna)+",":" ")+(tCiudad?" "+tCiudad:"."); };
+  const getTCargo = () => tCargoKey==="otro"?tCargoOtro: tCargoKey==="garzon"?"Garzon - Barista": tCargoKey==="cocina"?"Cocinero - Personal de Cocina": tCargoKey==="operario"?"Operario Multifuncional de Almacen y Alimentos al Paso": tCargo;
 
   const [anFecha, setAnFecha] = useState(today);
   const [anTipo, setAnTipo] = useState("plazo");
@@ -785,17 +793,21 @@ export default function App() {
         if (!tNombre) throw new Error("Ingresa el nombre del trabajador");
         if (!anDesc) throw new Error("Describe el cambio");
         await generarAnexo({
-          empresa, tNombre, tApellido, tRut, tCargo, tDom, tNac, tCivil,
+          empresa,
+          tNombre: tNombre+" "+tApellido,
+          tApellido, tRut,
+          tCargo: getTCargo(),
+          tDom: getTDom(),
+          tNac, tCivil,
           anFecha, anTipo, anFechaContrato, anFechaInicio, anFechaTermino,
           anTurno, anColacion
         });
         // Guardar/actualizar en Sheet si no estaba registrado
         if (!tIdSheet) {
-          const partes = tNombre.trim().split(" ");
           await apiGuardar({
             id: Date.now().toString(),
-            nombre: partes.slice(0,-1).join(" "), apellido: partes.slice(-1)[0],
-            rut: tRut, empresa, cargo: tCargo, domicilio: tDom,
+            nombre: tNombre, apellido: tApellido,
+            rut: tRut, empresa, cargo: getTCargo()||tCargo, domicilio: getTDom(),
             email: "", telefono: "", banco: "", tipoCuenta: "", cuenta: "",
             fechaIngreso: "", estado: "Activo",
             nacionalidad: tNac, estadoCivil: tCivil, fechaNacimiento: ""
@@ -945,24 +957,43 @@ export default function App() {
             rut={tRut} onRut={setTRut}
             cargo={tCargo} onCargo={setTCargo}
             trabSheet={trabSheet} loadingTrabs={loadingTrabs}
-            onSelectTrab={t=>{ setTNombre(t.nombre+" "+t.apellido); setTApellido(t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); setTDom(t.domicilio||""); setTNac(t.nacionalidad||"Chilena"); setTCivil(t.estadoCivil||"Soltero(a)"); setTIdSheet(t.id||""); }}
+            onSelectTrab={t=>{ setTNombre(t.nombre); setTApellido(t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); setTCargoKey(""); setTCargoOtro(""); setTNac(t.nacionalidad||"Chilena"); setTCivil(t.estadoCivil||"Soltero(a)"); setTIdSheet(t.id||""); const domParts=(t.domicilio||"").split(","); setTCalle(domParts[0]||""); setTComuna(domParts[1]?.trim()||""); setTCiudad(domParts[2]?.trim()||""); }}
           />
           {/* Datos adicionales trabajador para el anexo */}
           <div style={S.card}>
             <div style={{fontSize:14,fontWeight:700,marginBottom:12}}>Datos adicionales del trabajador</div>
             <div style={S.r2}>
-              <div><LBL first>Apellido(s)</LBL><input style={S.inp} value={tApellido} onChange={e=>setTApellido(e.target.value)} placeholder="Apellidos"/></div>
-              <div><LBL first>Nacionalidad</LBL><input style={S.inp} value={tNac} onChange={e=>setTNac(e.target.value)}/></div>
+              <div><LBL first>Nombre(s)</LBL><input style={S.inp} value={tNombre} onChange={e=>setTNombre(e.target.value)} placeholder="Juan"/></div>
+              <div><LBL first>Apellido(s)</LBL><input style={S.inp} value={tApellido} onChange={e=>setTApellido(e.target.value)} placeholder="Perez Garcia"/></div>
             </div>
             <div style={S.r2}>
+              <div><LBL>Nacionalidad</LBL><input style={S.inp} value={tNac} onChange={e=>setTNac(e.target.value)}/></div>
               <div><LBL>Estado civil</LBL>
                 <select style={S.sel} value={tCivil} onChange={e=>setTCivil(e.target.value)}>
                   {["Soltero(a)","Casado(a)","Divorciado(a)","Viudo(a)"].map(o=><option key={o}>{o}</option>)}
                 </select>
               </div>
-              <div><LBL>Profesion / Cargo</LBL><input style={S.inp} value={tCargo} onChange={e=>setTCargo(e.target.value)} placeholder="Garzon - Barista"/></div>
             </div>
-            <LBL>Domicilio completo</LBL><input style={S.inp} value={tDom} onChange={e=>setTDom(e.target.value)} placeholder="Calle 123, Comuna, Ciudad"/>
+            <LBL>Cargo</LBL>
+            <select style={S.sel} value={tCargoKey} onChange={e=>setTCargoKey(e.target.value)}>
+              <option value="">-- Selecciona --</option>
+              <option value="garzon">Garzon - Barista</option>
+              <option value="cocina">Cocinero - Personal de Cocina</option>
+              <option value="operario">Operario Multifuncional de Almacen y Alimentos al Paso</option>
+              <option value="otro">Otro</option>
+            </select>
+            {tCargoKey==="otro" && <input style={{...S.inp,marginTop:6}} value={tCargoOtro} onChange={e=>setTCargoOtro(e.target.value)} placeholder="Escribe el cargo..."/>}
+            <LBL>Domicilio</LBL>
+            <div style={S.r2}>
+              <div><input style={S.inp} value={tCalle} onChange={e=>setTCalle(e.target.value)} placeholder="Calle / Av."/></div>
+              <div><input style={S.inp} value={tNum} onChange={e=>setTNum(e.target.value)} placeholder="Numero"/></div>
+            </div>
+            <div style={S.r2}>
+              <div><input style={{...S.inp,marginTop:6}} value={tDepto} onChange={e=>setTDepto(e.target.value)} placeholder="Depto (opcional)"/></div>
+              <div><input style={{...S.inp,marginTop:6}} value={tComuna} onChange={e=>setTComuna(e.target.value)} placeholder="Comuna"/></div>
+            </div>
+            <input style={{...S.inp,marginTop:6}} value={tCiudad} onChange={e=>setTCiudad(e.target.value)} placeholder="Ciudad"/>
+            {(tCalle||tComuna) && <div style={{fontSize:11,color:"#888",marginTop:6}}>Vista previa: {[tCalle,tNum,tDepto].filter(Boolean).join(" ")}{tComuna?" "+tComuna+",":""}{tCiudad?" "+tCiudad:"."}</div>}
           </div>
           <div style={S.card}>
             <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Tipo de anexo</div>
@@ -1009,7 +1040,7 @@ export default function App() {
             rut={tRut} onRut={setTRut}
             cargo={tCargo} onCargo={setTCargo}
             trabSheet={trabSheet} loadingTrabs={loadingTrabs}
-            onSelectTrab={t=>{ setTNombre(t.nombre+" "+t.apellido); setTApellido(t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); setTDom(t.domicilio||""); setTNac(t.nacionalidad||"Chilena"); setTCivil(t.estadoCivil||"Soltero(a)"); setTIdSheet(t.id||""); }}
+            onSelectTrab={t=>{ setTNombre(t.nombre); setTApellido(t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); setTCargoKey(""); setTCargoOtro(""); setTNac(t.nacionalidad||"Chilena"); setTCivil(t.estadoCivil||"Soltero(a)"); setTIdSheet(t.id||""); const domParts=(t.domicilio||"").split(","); setTCalle(domParts[0]||""); setTComuna(domParts[1]?.trim()||""); setTCiudad(domParts[2]?.trim()||""); }}
           />
           <div style={S.card}>
             <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Amonestacion por inasistencias</div>
@@ -1032,7 +1063,7 @@ export default function App() {
             rut={tRut} onRut={setTRut}
             cargo={tCargo} onCargo={setTCargo}
             trabSheet={trabSheet} loadingTrabs={loadingTrabs}
-            onSelectTrab={t=>{ setTNombre(t.nombre+" "+t.apellido); setTApellido(t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); setTDom(t.domicilio||""); setTNac(t.nacionalidad||"Chilena"); setTCivil(t.estadoCivil||"Soltero(a)"); setTIdSheet(t.id||""); }}
+            onSelectTrab={t=>{ setTNombre(t.nombre); setTApellido(t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); setTCargoKey(""); setTCargoOtro(""); setTNac(t.nacionalidad||"Chilena"); setTCivil(t.estadoCivil||"Soltero(a)"); setTIdSheet(t.id||""); const domParts=(t.domicilio||"").split(","); setTCalle(domParts[0]||""); setTComuna(domParts[1]?.trim()||""); setTCiudad(domParts[2]?.trim()||""); }}
           />
           <div style={S.card}>
             <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Amonestacion por atrasos</div>
@@ -1053,7 +1084,7 @@ export default function App() {
             rut={tRut} onRut={setTRut}
             cargo={tCargo} onCargo={setTCargo}
             trabSheet={trabSheet} loadingTrabs={loadingTrabs}
-            onSelectTrab={t=>{ setTNombre(t.nombre+" "+t.apellido); setTApellido(t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); setTDom(t.domicilio||""); setTNac(t.nacionalidad||"Chilena"); setTCivil(t.estadoCivil||"Soltero(a)"); setTIdSheet(t.id||""); }}
+            onSelectTrab={t=>{ setTNombre(t.nombre); setTApellido(t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); setTCargoKey(""); setTCargoOtro(""); setTNac(t.nacionalidad||"Chilena"); setTCivil(t.estadoCivil||"Soltero(a)"); setTIdSheet(t.id||""); const domParts=(t.domicilio||"").split(","); setTCalle(domParts[0]||""); setTComuna(domParts[1]?.trim()||""); setTCiudad(domParts[2]?.trim()||""); }}
           />
           <div style={S.card}>
             <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Carta de no renovacion</div>
