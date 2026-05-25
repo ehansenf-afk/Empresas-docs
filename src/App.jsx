@@ -22,13 +22,14 @@ const EMP = {
 const SUELDOS = { 42: 539000, 30: 385000, 20: 256667 };
 const DIAS_C = ["Lun","Mar","Mie","Jue","Vie","Sab","Dom"];
 const DIAS_F = ["Lunes","Martes","Miercoles","Jueves","Viernes","Sabado","Domingo"];
-const WEBHOOK = "https://script.google.com/macros/s/AKfycbyXuD--zD-R40H-Lin09aotxP0342f2SvvT3DO9tzXtHgaAxTn1NXfzy2aTUffTHiYjcw/exec";
+const WEBHOOK = "https://script.google.com/macros/s/AKfycbzngB6W9lGc-W-Axv-yNCjbhi8wdXfLRdbhlpfEJGLbz-47lE7MrKla7iN-G2ICr0TO4w/exec";
 
 // ── API Trabajadores ──────────────────────────────────────────────────────────
 async function apiGuardar(trabajador) {
   try {
-    await fetch(WEBHOOK, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({accion:"guardar",...trabajador}) });
-  } catch(e) { console.error("Error guardando trabajador:", e); }
+    const resp = await fetch(WEBHOOK, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({accion:"guardar",...trabajador}) });
+    return await resp.json();
+  } catch(e) { console.error("Error guardando trabajador:", e); return {ok:false}; }
 }
 async function apiDesactivar(id) {
   try {
@@ -251,41 +252,173 @@ async function generarContratoPF(data) {
 // ── Generar Anexo ─────────────────────────────────────────────────────────────
 async function generarAnexo(data) {
   const emp = EMP[data.empresa];
+  const empNombreT = emp.nombre === "MALVARROSA SPA" ? "MALVARROSA SPA" : "VENTA DE ALIMENTOS ERIC FELIPE HANSEN FIGUEROA EIRL";
   const hoy = fmtF(new Date().toISOString().split("T")[0]);
-  const tiposMap = { plazo:"Prorroga de plazo fijo", indefinido:"Conversion a contrato indefinido (Art. 159 N4 CT)", sueldo:"Cambio de sueldo", cargo:"Cambio de cargo", horario:"Cambio de horario", otro:"Modificacion contractual" };
 
+  // Footer
+  const footer = new Footer({ children:[
+    new Paragraph({ alignment:AlignmentType.CENTER, children:[
+      new TextRun({text:"Anexo Contrato de trabajo página ", font:FONT, size:14}),
+      new TextRun({children:[PageNumber.CURRENT], font:FONT, size:14}),
+      new TextRun({text:"/", font:FONT, size:14}),
+      new TextRun({children:[PageNumber.TOTAL_PAGES], font:FONT, size:14}),
+      new TextRun({text:"  "+empNombreT+" y "+data.tApellido+" "+data.tNombre, font:FONT, size:14}),
+    ]})
+  ]});
+
+  // Párrafo apertura
+  const parrafoApertura = new Paragraph({
+    alignment: AlignmentType.JUSTIFIED,
+    spacing: { after:200 },
+    children:[
+      new TextRun({text:"En ", font:FONT, size:SZ}),
+      new TextRun({text:"Ñuñoa", font:FONT, size:SZ, bold:true}),
+      new TextRun({text:" a "+fmtF(data.anFecha)+", entre la Empresa "+empNombreT+". RUT "+emp.rut+", representada por don(a) "+emp.rep+",  RUT "+emp.repRut+", nacionalidad Chilena, estado civil Casado(a), ambos domiciliados en Ñuñoa, en adelante denominados ", font:FONT, size:SZ}),
+      new TextRun({text:'"EL EMPLEADOR"', font:FONT, size:SZ, bold:true}),
+      new TextRun({text:", por una parte y por la otra don(a) "+data.tNombre+", RUT "+data.tRut+", nacionalidad "+data.tNac+", estado civil "+data.tCivil+", de profesión "+data.tCargo+" con domicilio en "+data.tDom+", en adelante ", font:FONT, size:SZ}),
+      new TextRun({text:'"EL TRABAJADOR"', font:FONT, size:SZ, bold:true}),
+      new TextRun({text:", en los términos que pasan a exponer:", font:FONT, size:SZ}),
+    ]
+  });
+
+  // Artículo Tercero (siempre igual)
+  const artTercero = [
+    new Paragraph({spacing:{after:80}, children:[new TextRun({text:"Tercero :", font:FONT, size:SZ, bold:true})]}),
+    new Paragraph({alignment:AlignmentType.JUSTIFIED, spacing:{after:200}, children:[new TextRun({text:"En todo lo no modificado por el presente instrumento, seguirá rigiendo el Contrato de Trabajo. El presente instrumento se firma en dos ejemplares del mismo tenor, quedando uno en poder de cada parte.", font:FONT, size:SZ})]}),
+  ];
+
+  // Tabla firmas
   const tablaFirmas = new Table({
     width:{size:9360,type:WidthType.DXA}, columnWidths:[4680,4680],
     rows:[
       new TableRow({children:[
-        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:300,bottom:80,left:120,right:120},children:[P([T("_________________________________")],AlignmentType.CENTER,0)]}),
-        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:300,bottom:80,left:120,right:120},children:[P([T("_________________________________")],AlignmentType.CENTER,0)]}),
+        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:200,bottom:40,left:120,right:120},children:[new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:"_________________________________",font:FONT,size:SZ})]})]}),
+        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:200,bottom:40,left:120,right:120},children:[new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:"_________________________________",font:FONT,size:SZ})]})]}),
       ]}),
       new TableRow({children:[
-        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:0,bottom:0,left:120,right:120},children:[P([T(emp.nombre,{bold:true})],AlignmentType.CENTER,0),P([T(emp.rut)],AlignmentType.CENTER,0),P([T("Empleador")],AlignmentType.CENTER,0)]}),
-        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:0,bottom:0,left:120,right:120},children:[P([T(data.tNombre,{bold:true})],AlignmentType.CENTER,0),P([T(data.tRut)],AlignmentType.CENTER,0),P([T("Trabajador")],AlignmentType.CENTER,0)]}),
+        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:0,bottom:0,left:120,right:120},children:[
+          new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:empNombreT,font:FONT,size:SZ,bold:true})]}),
+          new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:emp.rut,font:FONT,size:SZ})]}),
+          new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:"Empleador",font:FONT,size:SZ})]}),
+        ]}),
+        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:0,bottom:0,left:120,right:120},children:[
+          new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:data.tNombre,font:FONT,size:SZ,bold:true})]}),
+          new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:data.tRut,font:FONT,size:SZ})]}),
+          new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:"Trabajador",font:FONT,size:SZ})]}),
+        ]}),
       ]}),
     ]
   });
 
+  let artPrimero = [];
+  let artSegundo = [];
+
+  // ── TIPO: Renovacion Plazo Fijo ──────────────────────────────────────────────
+  if (data.anTipo === "plazo") {
+    artPrimero = [
+      new Paragraph({spacing:{after:80}, children:[new TextRun({text:"Primero :", font:FONT, size:SZ, bold:true})]}),
+      new Paragraph({alignment:AlignmentType.JUSTIFIED, spacing:{after:200}, children:[new TextRun({text:"Con fecha "+fmtF(data.anFechaContrato)+" las partes celebraron un contrato de trabajo en virtud del cual don(a) "+data.tNombre+", ha prestado sus servicios en calidad de "+data.tCargo+" para la Empresa, en adelante \"el Contrato de Trabajo\", que a la fecha de emisión de este documento tiene carácter de Plazo Fijo.", font:FONT, size:SZ})]}),
+    ];
+    artSegundo = [
+      new Paragraph({spacing:{after:80}, children:[new TextRun({text:"Segundo :", font:FONT, size:SZ, bold:true})]}),
+      new Paragraph({alignment:AlignmentType.JUSTIFIED, spacing:{after:100}, children:[new TextRun({text:"Se realizan las siguientes modificaciones al Contrato de Trabajo.", font:FONT, size:SZ})]}),
+      new Paragraph({spacing:{after:40}, indent:{left:360}, children:[new TextRun({text:"• Se considera fecha de inicio de las condiciones indicadas en este anexo el "+fmtF(data.anFechaInicio), font:FONT, size:SZ})]}),
+      new Paragraph({spacing:{after:200}, indent:{left:360}, children:[new TextRun({text:"• Se ajusta la fecha de término de contrato para el día "+fmtF(data.anFechaTermino), font:FONT, size:SZ})]}),
+    ];
+  }
+
+  // ── TIPO: Renovacion Indefinido ──────────────────────────────────────────────
+  if (data.anTipo === "indefinido") {
+    artPrimero = [
+      new Paragraph({spacing:{after:80}, children:[new TextRun({text:"Primero :", font:FONT, size:SZ, bold:true})]}),
+      new Paragraph({alignment:AlignmentType.JUSTIFIED, spacing:{after:200}, children:[new TextRun({text:"Con fecha "+fmtF(data.anFechaContrato)+" las partes celebraron un contrato de trabajo en virtud del cual don(a) "+data.tNombre+", ha prestado sus servicios en calidad de "+data.tCargo+" para la Empresa, en adelante \"el Contrato de Trabajo\", que a la fecha de emisión de este documento tiene carácter de Indefinido.", font:FONT, size:SZ})]}),
+    ];
+    artSegundo = [
+      new Paragraph({spacing:{after:80}, children:[new TextRun({text:"Segundo :", font:FONT, size:SZ, bold:true})]}),
+      new Paragraph({alignment:AlignmentType.JUSTIFIED, spacing:{after:100}, children:[new TextRun({text:"Se realizan las siguientes modificaciones al Contrato de Trabajo.", font:FONT, size:SZ})]}),
+      new Paragraph({spacing:{after:40}, indent:{left:360}, children:[new TextRun({text:"• Se considera fecha de inicio de las condiciones indicadas en este anexo el "+fmtF(data.anFechaInicio), font:FONT, size:SZ})]}),
+      new Paragraph({spacing:{after:200}, indent:{left:360}, children:[new TextRun({text:"• Se ajusta duración del contrato a Indefinido", font:FONT, size:SZ})]}),
+    ];
+  }
+
+  // ── TIPO: Cambio de Horario ──────────────────────────────────────────────────
+  if (data.anTipo === "horario") {
+    // Calcular tabla de horario nuevo
+    const colW = [1800,1000,1000,1000,1000,1000,1000,1000];
+    const dias  = ["Sección","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
+    function makeRowH(vals, isHeader, isSection) {
+      return new TableRow({ children: vals.map((v,i) => new TableCell({
+        borders,
+        verticalAlign: VerticalAlign.CENTER,
+        width:{size:colW[i],type:WidthType.DXA},
+        shading: isHeader?{fill:"D9D9D9",type:ShadingType.CLEAR}:isSection?{fill:"BFBFBF",type:ShadingType.CLEAR}:undefined,
+        margins:{top:50,bottom:50,left:80,right:80},
+        children:[new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:v,font:FONT,size:16,bold:isHeader||isSection||(i===0&&!isHeader)})]})]
+      }))});
+    }
+    function sectionRowH(label) {
+      return new TableRow({children:[new TableCell({
+        borders, columnSpan:8,
+        width:{size:colW.reduce((a,b)=>a+b,0),type:WidthType.DXA},
+        shading:{fill:"BFBFBF",type:ShadingType.CLEAR},
+        margins:{top:50,bottom:50,left:80,right:80},
+        children:[new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:label,font:FONT,size:16,bold:true})]})]
+      })]});
+    }
+    const turno = data.anTurno;
+    const col   = data.anColacion;
+    const entradas  = DIAS_F.map((d,i)=>{ const r=turno[i]; return r.on&&r.e?r.e:"00:00"; });
+    const salidas1  = DIAS_F.map((d,i)=>{ const r=turno[i]; if(!r.on||!r.e||!r.s)return "00:00"; return calcBreak(r.e,r.s,col); });
+    const breaks    = DIAS_F.map((d,i)=>{ const r=turno[i]; if(!r.on)return "00:00"; return String(Math.floor(col/60)).padStart(2,"0")+":"+String(col%60).padStart(2,"0"); });
+    const entradas2 = DIAS_F.map((d,i)=>{ const r=turno[i]; if(!r.on||!r.e||!r.s)return "00:00"; const [s1h,s1m]=salidas1[i].split(":").map(Number); const t=s1h*60+s1m+col; return String(Math.floor(t/60)).padStart(2,"0")+":"+String(t%60).padStart(2,"0"); });
+    const salidas2  = DIAS_F.map((d,i)=>{ const r=turno[i]; return r.on&&r.s?r.s:"00:00"; });
+
+    const tablaHorario = new Table({
+      width:{size:colW.reduce((a,b)=>a+b,0),type:WidthType.DXA}, columnWidths:colW,
+      rows:[
+        makeRowH(dias,true,false),
+        sectionRowH("Primera mitad jornada"),
+        makeRowH(["Entrada",...entradas],false,false),
+        makeRowH(["Salida",...salidas1],false,false),
+        sectionRowH("Tiempo Descanso"),
+        makeRowH(["Libre disposición",...breaks],false,false),
+        sectionRowH("Segunda mitad jornada"),
+        makeRowH(["Entrada",...entradas2],false,false),
+        makeRowH(["Salida",...salidas2],false,false),
+      ]
+    });
+
+    artPrimero = [
+      new Paragraph({spacing:{after:80}, children:[new TextRun({text:"Primero :", font:FONT, size:SZ, bold:true})]}),
+      new Paragraph({alignment:AlignmentType.JUSTIFIED, spacing:{after:200}, children:[new TextRun({text:"Con fecha "+fmtF(data.anFechaContrato)+" las partes celebraron un contrato de trabajo en virtud del cual don(a) "+data.tNombre+", ha prestado sus servicios en calidad de "+data.tCargo+" para la Empresa, en adelante \"el Contrato de Trabajo\".", font:FONT, size:SZ})]}),
+    ];
+    artSegundo = [
+      new Paragraph({spacing:{after:80}, children:[new TextRun({text:"Segundo :", font:FONT, size:SZ, bold:true})]}),
+      new Paragraph({alignment:AlignmentType.JUSTIFIED, spacing:{after:100}, children:[new TextRun({text:"Se realizan las siguientes modificaciones al Contrato de Trabajo.", font:FONT, size:SZ})]}),
+      new Paragraph({spacing:{after:40}, indent:{left:360}, children:[new TextRun({text:"• Se considera fecha de inicio de las condiciones indicadas en este anexo el "+fmtF(data.anFechaInicio), font:FONT, size:SZ})]}),
+      new Paragraph({spacing:{after:100}, indent:{left:360}, children:[new TextRun({text:"• Se modifica el horario de trabajo, quedando de la siguiente manera:", font:FONT, size:SZ})]}),
+      tablaHorario,
+      new Paragraph({alignment:AlignmentType.JUSTIFIED, spacing:{after:200, before:100}, children:[new TextRun({text:"La colación es de "+col+" minutos y es de cargo del trabajador.", font:FONT, size:SZ})]}),
+    ];
+  }
+
   const doc = new Document({ sections:[{
     properties:{ page:{ size:{width:11906,height:16838}, margin:{top:1134,right:1134,bottom:1134,left:1134} } },
+    footers:{ default: footer },
     children:[
-      titulo("ANEXO DE CONTRATO DE TRABAJO"),
-      P([]),
-      P([T("En Ñuñoa, a "), T(hoy,{bold:true}), T(", entre "), T(emp.nombre,{bold:true}), T(", R.U.T. "+emp.rut+", representado por "+emp.rep+", cedula "+emp.repRut+", en adelante el Empleador, y don(a) "), T(data.tNombre,{bold:true}), T(", RUT "+data.tRut+", cargo: "+data.tCargo+", en adelante el Trabajador, se ha convenido el siguiente Anexo al Contrato de Trabajo:")], AlignmentType.JUSTIFIED, 120),
-      art("ARTICULO PRIMERO :", "Las partes acuerdan modificar el contrato de trabajo en los siguientes terminos: "+tiposMap[data.anTipo]+". "+data.anDesc),
-      art("ARTICULO SEGUNDO :", "Nueva condicion contractual: "+data.anCond+". Esta modificacion rige a partir de "+fmtF(data.anFecha)+"."),
-      art("ARTICULO TERCERO :", "En todo lo demas, las clausulas del contrato original permanecen vigentes e inalteradas, siendo este Anexo parte integrante del mismo."),
-      art("ARTICULO CUARTO :", "El presente Anexo se firma en dos ejemplares del mismo tenor y fecha, quedando uno en poder de cada contratante."),
-      P([T("")], AlignmentType.JUSTIFIED, 400),
+      new Paragraph({alignment:AlignmentType.CENTER, spacing:{after:240}, children:[new TextRun({text:"ANEXO CONTRATO DE TRABAJO", font:FONT, size:SZ_T, bold:true, underline:{type:UnderlineType.SINGLE}})]}),
+      parrafoApertura,
+      ...artPrimero,
+      ...artSegundo,
+      ...artTercero,
       tablaFirmas,
     ]
   }]});
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, "Anexo_"+data.tNombre.replace(" ","_")+"_"+data.anFecha+".docx");
+  saveAs(blob, "Anexo_"+data.tApellido+"_"+data.tNombre+"_"+data.anFecha+".docx");
 }
+
 
 // ── Generar Amonestacion Inasistencias ────────────────────────────────────────
 async function generarAmonInasistencia(data) {
@@ -595,13 +728,22 @@ export default function App() {
   const updTurno = useCallback((i,k,val)=>setTurno(p=>p.map((r,j)=>j===i?{...r,[k]:val}:r)),[]);
 
   const [tNombre, setTNombre] = useState("");
+  const [tApellido, setTApellido] = useState("");
   const [tRut, setTRut] = useState("");
   const [tCargo, setTCargo] = useState("");
+  const [tDom, setTDom] = useState("");
+  const [tNac, setTNac] = useState("Chilena");
+  const [tCivil, setTCivil] = useState("Soltero(a)");
+  const [tIdSheet, setTIdSheet] = useState("");
 
   const [anFecha, setAnFecha] = useState(today);
   const [anTipo, setAnTipo] = useState("plazo");
-  const [anDesc, setAnDesc] = useState("");
-  const [anCond, setAnCond] = useState("");
+  const [anFechaContrato, setAnFechaContrato] = useState(today);
+  const [anFechaInicio, setAnFechaInicio] = useState(today);
+  const [anFechaTermino, setAnFechaTermino] = useState(today);
+  const [anTurno, setAnTurno] = useState(DIAS_C.map(()=>({on:false,e:"",s:""})));
+  const [anColacion, setAnColacion] = useState(30);
+  const updAnTurno = useCallback((i,k,val)=>setAnTurno(p=>p.map((r,j)=>j===i?{...r,[k]:val}:r)),[]);
 
   const [aiFecha, setAiFecha] = useState(today);
   const [aiDias, setAiDias] = useState("");
@@ -642,7 +784,24 @@ export default function App() {
       } else if (docTab==="anexo") {
         if (!tNombre) throw new Error("Ingresa el nombre del trabajador");
         if (!anDesc) throw new Error("Describe el cambio");
-        await generarAnexo({empresa, tNombre, tRut, tCargo, anFecha, anTipo, anDesc, anCond});
+        await generarAnexo({
+          empresa, tNombre, tApellido, tRut, tCargo, tDom, tNac, tCivil,
+          anFecha, anTipo, anFechaContrato, anFechaInicio, anFechaTermino,
+          anTurno, anColacion
+        });
+        // Guardar/actualizar en Sheet si no estaba registrado
+        if (!tIdSheet) {
+          const partes = tNombre.trim().split(" ");
+          await apiGuardar({
+            id: Date.now().toString(),
+            nombre: partes.slice(0,-1).join(" "), apellido: partes.slice(-1)[0],
+            rut: tRut, empresa, cargo: tCargo, domicilio: tDom,
+            email: "", telefono: "", banco: "", tipoCuenta: "", cuenta: "",
+            fechaIngreso: "", estado: "Activo",
+            nacionalidad: tNac, estadoCivil: tCivil, fechaNacimiento: ""
+          });
+          await cargarTrabajadores(empresa);
+        }
       } else if (docTab==="am_inasistencia") {
         if (!tNombre) throw new Error("Ingresa el nombre del trabajador");
         if (!aiDias) throw new Error("Ingresa las fechas de inasistencia");
@@ -786,24 +945,61 @@ export default function App() {
             rut={tRut} onRut={setTRut}
             cargo={tCargo} onCargo={setTCargo}
             trabSheet={trabSheet} loadingTrabs={loadingTrabs}
-            onSelectTrab={t=>{ setTNombre(t.nombre+" "+t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); }}
+            onSelectTrab={t=>{ setTNombre(t.nombre+" "+t.apellido); setTApellido(t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); setTDom(t.domicilio||""); setTNac(t.nacionalidad||"Chilena"); setTCivil(t.estadoCivil||"Soltero(a)"); setTIdSheet(t.id||""); }}
           />
+          {/* Datos adicionales trabajador para el anexo */}
           <div style={S.card}>
-            <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Datos del anexo</div>
+            <div style={{fontSize:14,fontWeight:700,marginBottom:12}}>Datos adicionales del trabajador</div>
+            <div style={S.r2}>
+              <div><LBL first>Apellido(s)</LBL><input style={S.inp} value={tApellido} onChange={e=>setTApellido(e.target.value)} placeholder="Apellidos"/></div>
+              <div><LBL first>Nacionalidad</LBL><input style={S.inp} value={tNac} onChange={e=>setTNac(e.target.value)}/></div>
+            </div>
+            <div style={S.r2}>
+              <div><LBL>Estado civil</LBL>
+                <select style={S.sel} value={tCivil} onChange={e=>setTCivil(e.target.value)}>
+                  {["Soltero(a)","Casado(a)","Divorciado(a)","Viudo(a)"].map(o=><option key={o}>{o}</option>)}
+                </select>
+              </div>
+              <div><LBL>Profesion / Cargo</LBL><input style={S.inp} value={tCargo} onChange={e=>setTCargo(e.target.value)} placeholder="Garzon - Barista"/></div>
+            </div>
+            <LBL>Domicilio completo</LBL><input style={S.inp} value={tDom} onChange={e=>setTDom(e.target.value)} placeholder="Calle 123, Comuna, Ciudad"/>
+          </div>
+          <div style={S.card}>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Tipo de anexo</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
+              {[["plazo","🔄","Renovacion plazo fijo"],["indefinido","♾️","Conversion indefinido"],["horario","🕐","Cambio de horario"]].map(([k,ico,lbl])=>(
+                <div key={k} style={dtcSt(anTipo===k)} onClick={()=>setAnTipo(k)}>
+                  <div style={{fontSize:18,marginBottom:3}}>{ico}</div>
+                  <div style={{fontSize:10,color:anTipo===k?"#185FA5":"#666",fontWeight:anTipo===k?600:400,lineHeight:1.3}}>{lbl}</div>
+                </div>
+              ))}
+            </div>
             <LBL first>Fecha del anexo</LBL><input style={S.inp} type="date" value={anFecha} onChange={e=>setAnFecha(e.target.value)}/>
-            <LBL>Tipo de modificacion</LBL>
-            <select style={S.sel} value={anTipo} onChange={e=>setAnTipo(e.target.value)}>
-              <option value="plazo">Prorroga de plazo fijo</option>
-              <option value="indefinido">Conversion a indefinido (Art.159 N4 CT)</option>
-              <option value="sueldo">Cambio de sueldo</option>
-              <option value="cargo">Cambio de cargo</option>
-              <option value="horario">Cambio de horario</option>
-              <option value="otro">Otro</option>
-            </select>
-            <LBL>Descripcion del cambio</LBL>
-            <textarea style={S.ta} value={anDesc} onChange={e=>setAnDesc(e.target.value)} placeholder="Describe que cambia..."/>
-            <LBL>Nueva condicion contractual</LBL>
-            <textarea style={S.ta} value={anCond} onChange={e=>setAnCond(e.target.value)} placeholder="Ej: A partir del [fecha], la jornada sera de..."/>
+            <LBL>Fecha inicio contrato original</LBL><input style={S.inp} type="date" value={anFechaContrato} onChange={e=>setAnFechaContrato(e.target.value)}/>
+            <LBL>Fecha inicio nuevas condiciones</LBL><input style={S.inp} type="date" value={anFechaInicio} onChange={e=>setAnFechaInicio(e.target.value)}/>
+            {anTipo==="plazo" && <>
+              <LBL>Nueva fecha de termino</LBL><input style={S.inp} type="date" value={anFechaTermino} onChange={e=>setAnFechaTermino(e.target.value)}/>
+            </>}
+            {anTipo==="horario" && <>
+              <LBL>Colacion</LBL>
+              <div style={{display:"flex",gap:8}}>
+                {[[30,"30 min"],[60,"1 hora"]].map(([m,lbl])=>(
+                  <button key={m} style={pill(anColacion===m)} onClick={()=>setAnColacion(m)}>{lbl}</button>
+                ))}
+              </div>
+              <LBL>Horario nuevo</LBL>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,marginTop:8}}>
+                <thead><tr>{["Dia","","Entrada","Salida"].map((h,i)=><th key={i} style={{background:"#f5f5f0",padding:"6px 4px",textAlign:"center",border:"1px solid #e8e8e5",color:"#888",fontWeight:500}}>{h}</th>)}</tr></thead>
+                <tbody>{DIAS_C.map((d,i)=>(
+                  <tr key={i} style={{background:anTurno[i].on?"white":"#fafaf8"}}>
+                    <td style={{padding:"4px 6px",border:"1px solid #e8e8e5",fontWeight:600,color:anTurno[i].on?"#185FA5":"#bbb",textAlign:"center",fontSize:12}}>{d}</td>
+                    <td style={{padding:4,border:"1px solid #e8e8e5",textAlign:"center"}}><input type="checkbox" checked={anTurno[i].on} onChange={ev=>updAnTurno(i,"on",ev.target.checked)} style={{width:18,height:18,cursor:"pointer",accentColor:"#185FA5"}}/></td>
+                    <td style={{padding:3,border:"1px solid #e8e8e5"}}><input value={anTurno[i].e} onChange={ev=>updAnTurno(i,"e",ev.target.value)} placeholder="09:00" disabled={!anTurno[i].on} style={{border:"none",background:"transparent",color:anTurno[i].on?"#1a1a1a":"#ccc",padding:"4px",width:"100%",fontSize:13,textAlign:"center",outline:"none"}}/></td>
+                    <td style={{padding:3,border:"1px solid #e8e8e5"}}><input value={anTurno[i].s} onChange={ev=>updAnTurno(i,"s",ev.target.value)} placeholder="18:00" disabled={!anTurno[i].on} style={{border:"none",background:"transparent",color:anTurno[i].on?"#1a1a1a":"#ccc",padding:"4px",width:"100%",fontSize:13,textAlign:"center",outline:"none"}}/></td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </>}
           </div>
         </>}
 
@@ -813,7 +1009,7 @@ export default function App() {
             rut={tRut} onRut={setTRut}
             cargo={tCargo} onCargo={setTCargo}
             trabSheet={trabSheet} loadingTrabs={loadingTrabs}
-            onSelectTrab={t=>{ setTNombre(t.nombre+" "+t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); }}
+            onSelectTrab={t=>{ setTNombre(t.nombre+" "+t.apellido); setTApellido(t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); setTDom(t.domicilio||""); setTNac(t.nacionalidad||"Chilena"); setTCivil(t.estadoCivil||"Soltero(a)"); setTIdSheet(t.id||""); }}
           />
           <div style={S.card}>
             <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Amonestacion por inasistencias</div>
@@ -836,7 +1032,7 @@ export default function App() {
             rut={tRut} onRut={setTRut}
             cargo={tCargo} onCargo={setTCargo}
             trabSheet={trabSheet} loadingTrabs={loadingTrabs}
-            onSelectTrab={t=>{ setTNombre(t.nombre+" "+t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); }}
+            onSelectTrab={t=>{ setTNombre(t.nombre+" "+t.apellido); setTApellido(t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); setTDom(t.domicilio||""); setTNac(t.nacionalidad||"Chilena"); setTCivil(t.estadoCivil||"Soltero(a)"); setTIdSheet(t.id||""); }}
           />
           <div style={S.card}>
             <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Amonestacion por atrasos</div>
@@ -857,7 +1053,7 @@ export default function App() {
             rut={tRut} onRut={setTRut}
             cargo={tCargo} onCargo={setTCargo}
             trabSheet={trabSheet} loadingTrabs={loadingTrabs}
-            onSelectTrab={t=>{ setTNombre(t.nombre+" "+t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); }}
+            onSelectTrab={t=>{ setTNombre(t.nombre+" "+t.apellido); setTApellido(t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); setTDom(t.domicilio||""); setTNac(t.nacionalidad||"Chilena"); setTCivil(t.estadoCivil||"Soltero(a)"); setTIdSheet(t.id||""); }}
           />
           <div style={S.card}>
             <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Carta de no renovacion</div>
