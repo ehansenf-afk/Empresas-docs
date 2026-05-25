@@ -826,7 +826,6 @@ export default function App() {
         });
       } else if (docTab==="anexo") {
         if (!tNombre) throw new Error("Ingresa el nombre del trabajador");
-        if (!anDesc) throw new Error("Describe el cambio");
         await generarAnexo({
           empresa,
           tNombre: tNombre+" "+tApellido,
