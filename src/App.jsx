@@ -700,7 +700,7 @@ function FormPF({value, onChange}) {
       <LBL>Calle</LBL><input style={S.inp} value={value.calle} onChange={e=>u("calle",e.target.value)} placeholder="Av. Ejemplo"/>
       <div style={S.r2}>
         <div><LBL>Numero</LBL><input style={S.inp} value={value.num} onChange={e=>u("num",e.target.value)} placeholder="123"/></div>
-        <div><LBL>Comuna</LBL><input style={S.inp} value={value.comuna} onChange={e=>u("comuna",e.target.value)} placeholder="Ñuñoa"/></div>
+        <div><LBL>Depto <span style={{color:"#999",fontSize:11}}>(opcional)</span></LBL><input style={S.inp} value={value.depto||""} onChange={e=>u("depto",e.target.value)} placeholder="Dpto 2B"/></div>
       </div>
       <LBL>Ciudad</LBL>
       <select style={S.sel} value={value.ciudad} onChange={e=>u("ciudad",e.target.value)||u("comuna","")}>
