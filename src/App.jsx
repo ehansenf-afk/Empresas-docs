@@ -7,12 +7,16 @@ const EMP = {
   "Malvarrosa SpA": {
     nombre: "MALVARROSA SPA", rut: "76.475.913-3",
     rep: "MAGALY DEL CARMEN FIGUEROA ASTUDILLO", repRut: "6.974.618-7",
-    dom: "Av. Ortuzar 250, Ñuñoa, Santiago"
+    dom: "Av. Ortuzar 250, Ñuñoa, Santiago",
+    dir: "AV ORTUZAR #250", comuna: "Ñuñoa",
+    giro: "PASTELERIA SALON DE TE - MINIMARKET"
   },
   "Eric Hansen EIRL": {
     nombre: "VENTA DE ALIMENTOS ERIC FELIPE HANSEN FIGUEROA EIRL", rut: "77.840.316-1",
     rep: "ERIC FELIPE HANSEN FIGUEROA", repRut: "19.077.228-4",
-    dom: "Av. Ossa 1624, Ñuñoa, Santiago"
+    dom: "Av. Ossa 1624, Ñuñoa, Santiago",
+    dir: "AV OSSA 1624", comuna: "Ñuñoa",
+    giro: "ACTIVIDADES DE RESTAURANTES Y DE SERVICIO MOVIL DE COMIDAS"
   }
 };
 const SUELDOS = { 42: 539000, 30: 385000, 20: 256667 };
@@ -353,33 +357,108 @@ async function generarAmonAtraso(data) {
 // ── Generar No Renovacion ─────────────────────────────────────────────────────
 async function generarNoRenovacion(data) {
   const emp = EMP[data.empresa];
+
+  // Nombre empresa en formato titulo
+  const empNombreT = emp.nombre === "MALVARROSA SPA" ? "Malvarrosa Spa" : "Venta de Alimentos Eric Felipe Hansen Figueroa Eirl";
+
+  // Bordes invisibles para encabezado
+  const nb = { style:BorderStyle.NONE, size:0, color:"FFFFFF" };
+  const nbAll = { top:nb, bottom:nb, left:nb, right:nb };
+  function encRow(label, valor) {
+    return new TableRow({ children:[
+      new TableCell({ borders:nbAll, width:{size:2000,type:WidthType.DXA}, margins:{top:30,bottom:30,left:0,right:0},
+        children:[new Paragraph({children:[new TextRun({text:label, font:FONT, size:18})]})]
+      }),
+      new TableCell({ borders:nbAll, width:{size:7360,type:WidthType.DXA}, margins:{top:30,bottom:30,left:0,right:0},
+        children:[new Paragraph({children:[new TextRun({text:valor, font:FONT, size:18})]})]
+      }),
+    ]});
+  }
+
+  const tablaEnc = new Table({
+    width:{size:9360,type:WidthType.DXA}, columnWidths:[2000,7360],
+    borders:{top:nb,bottom:nb,left:nb,right:nb,insideH:nb,insideV:nb},
+    rows:[
+      encRow("Razón Social", empNombreT),
+      encRow("R.U.T.", emp.rut),
+      encRow("Dirección", emp.dir),
+      encRow("Comuna", emp.comuna),
+      encRow("Giro", emp.giro),
+    ]
+  });
+
+  const lineaSep = new Paragraph({
+    spacing:{after:200,before:80},
+    border:{bottom:{style:BorderStyle.SINGLE,size:12,color:"185FA5"}},
+    children:[]
+  });
+
+  const tituloNR = new Paragraph({
+    alignment:AlignmentType.CENTER,
+    spacing:{after:280},
+    children:[new TextRun({
+      text:"AVISO NO RENOVACIÓN CONTRATO PLAZO FIJO",
+      font:FONT, size:22, bold:true, color:"185FA5",
+      underline:{type:UnderlineType.SINGLE}
+    })]
+  });
+
+  const tablaFirmas = new Table({
+    width:{size:9360,type:WidthType.DXA}, columnWidths:[4680,4680],
+    rows:[
+      new TableRow({children:[
+        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:240,bottom:40,left:120,right:120},
+          children:[new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:"_________________________________",font:FONT,size:SZ})]})]
+        }),
+        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:240,bottom:40,left:120,right:120},
+          children:[new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:"_________________________________",font:FONT,size:SZ})]})]
+        }),
+      ]}),
+      new TableRow({children:[
+        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:0,bottom:0,left:120,right:120},children:[
+          new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:"Representante Legal",font:FONT,size:SZ})]}),
+          new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:empNombreT.toUpperCase(),font:FONT,size:SZ,bold:true})]}),
+          new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:emp.rut,font:FONT,size:SZ})]}),
+        ]}),
+        new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:0,bottom:0,left:120,right:120},children:[
+          new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:"Recibí Notificación",font:FONT,size:SZ})]}),
+          new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:data.tNombre,font:FONT,size:SZ,bold:true})]}),
+          new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:data.tRut,font:FONT,size:SZ})]}),
+        ]}),
+      ]}),
+    ]
+  });
+
   const doc = new Document({ sections:[{
     properties:{ page:{ size:{width:11906,height:16838}, margin:{top:1134,right:1134,bottom:1134,left:1134} } },
     children:[
-      titulo("CARTA DE NO RENOVACION DE CONTRATO"),
-      P([]),
-      P([T("Ñuñoa, "+fmtF(data.nrFechaDoc))], AlignmentType.JUSTIFIED, 120),
-      P([T("Senor(a):")], AlignmentType.JUSTIFIED, 40),
-      P([T(data.tNombre,{bold:true})], AlignmentType.JUSTIFIED, 40),
-      P([T("Cargo: "+data.tCargo)], AlignmentType.JUSTIFIED, 40),
-      P([T("RUT: "+data.tRut)], AlignmentType.JUSTIFIED, 120),
-      P([T("Por medio de la presente, "+emp.nombre+", R.U.T. "+emp.rut+", domiciliada en "+emp.dom+", representada por "+emp.rep+", cedula "+emp.repRut+", viene en notificarle formalmente que el contrato de trabajo a plazo fijo que lo une con esta empresa NO sera renovado al vencimiento del plazo convenido.")], AlignmentType.JUSTIFIED, 80),
-      P([T("El contrato de trabajo terminara definitivamente el dia "+fmtF(data.nrFechaTermino)+", fecha en que se cumple el plazo estipulado, conforme a lo establecido en el Articulo 159 N4 del Codigo del Trabajo, que dispone que el contrato de trabajo termina por vencimiento del plazo convenido.")], AlignmentType.JUSTIFIED, 80),
-      data.nrMotivo ? P([T("Motivo de la no renovacion: "+data.nrMotivo+".")], AlignmentType.JUSTIFIED, 80) : P([]),
-      P([T("La empresa se compromete a tener al dia todas las cotizaciones previsionales y de salud a la fecha del termino del contrato, y a suscribir el finiquito correspondiente en la oportunidad legal.")], AlignmentType.JUSTIFIED, 80),
-      P([T("Se le solicita hacer entrega de todos los elementos, herramientas, uniformes y accesorios de propiedad de la empresa que se encuentren en su poder, a mas tardar el dia del termino del contrato.")], AlignmentType.JUSTIFIED, 200),
-      P([T("Acuse de recibo de la presente notificacion:")], AlignmentType.JUSTIFIED, 300),
-      new Table({ width:{size:9360,type:WidthType.DXA}, columnWidths:[4680,4680], rows:[
-        new TableRow({children:[
-          new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:0,bottom:0,left:120,right:120},children:[P([T("_________________________________")],AlignmentType.CENTER,0),P([T(emp.rep,{bold:true})],AlignmentType.CENTER,0),P([T("Empleador")],AlignmentType.CENTER,0)]}),
-          new TableCell({borders:noBorders,width:{size:4680,type:WidthType.DXA},margins:{top:0,bottom:0,left:120,right:120},children:[P([T("_________________________________")],AlignmentType.CENTER,0),P([T(data.tNombre,{bold:true})],AlignmentType.CENTER,0),P([T("Trabajador / Fecha recepcion")],AlignmentType.CENTER,0)]}),
-        ]}),
+      tablaEnc,
+      lineaSep,
+      tituloNR,
+      new Paragraph({spacing:{after:160},children:[new TextRun({text:"Ñuñoa, "+fmtF(data.nrFechaDoc),font:FONT,size:SZ})]}),
+      new Paragraph({spacing:{after:40},children:[new TextRun({text:"Señor (a):"+data.tNombre,font:FONT,size:SZ})]}),
+      new Paragraph({spacing:{after:40},children:[new TextRun({text:"Rut : "+data.tRut,font:FONT,size:SZ})]}),
+      new Paragraph({spacing:{after:200},children:[new TextRun({text:"P R E S E N T E",font:FONT,size:SZ,bold:true})]}),
+      new Paragraph({alignment:AlignmentType.JUSTIFIED,spacing:{after:160},children:[
+        new TextRun({text:"Nos permitimos comunicar que, con esta fecha, ",font:FONT,size:SZ}),
+        new TextRun({text:fmtF(data.nrFechaTermino),font:FONT,size:SZ}),
+        new TextRun({text:", se ha resuelto no renovar su contrato de trabajo que lo vincula con la empresa, por la causal del artículo ",font:FONT,size:SZ}),
+        new TextRun({text:"Art. 159 Número 4",font:FONT,size:SZ,bold:true}),
+        new TextRun({text:", del Código del Trabajo, esto es Vencimiento del plazo convenido en el contrato. La duración del contrato de plazo fijo no podrá exceder de un año.",font:FONT,size:SZ}),
       ]}),
+      new Paragraph({alignment:AlignmentType.JUSTIFIED,spacing:{after:160},children:[new TextRun({text:"Informo que sus cotizaciones previsionales se encuentran al día. Además, le adjuntamos certificado de cotizaciones de las entidades de previsión a las que se encuentra afiliado, que dan cuenta que las cotizaciones previsionales, del período trabajado, se encuentran pagadas.",font:FONT,size:SZ})]}),
+      new Paragraph({alignment:AlignmentType.JUSTIFIED,spacing:{after:160},children:[new TextRun({text:"Asimismo se ha escogido el metodo Electrónico para pago de los diferentes conceptos del finiquito, si usted no desea que esto sea realice de esta manera y sea presencial, debe informar su decisión con antelación a la empresa, para que se coordine el pago según su preferencia ante la Dirección del Trabajo o un Notario Público. De no hacer ninguna indicación se entenderá que el pago será electrónico.",font:FONT,size:SZ})]}),
+      new Paragraph({alignment:AlignmentType.JUSTIFIED,spacing:{after:400},children:[new TextRun({text:"Usted podrá al momento de aceptar la subscripcion del finiquito realizar una reserva de derechos para accionar judicialmente contra el empleador como consigna el codigo del trabajo art. 177.",font:FONT,size:SZ})]}),
+      tablaFirmas,
+      new Paragraph({spacing:{after:160},children:[]}),
+      new Paragraph({spacing:{after:40},children:[new TextRun({text:"C.C. Jefatura Directa",font:FONT,size:SZ})]}),
+      new Paragraph({spacing:{after:40},children:[new TextRun({text:"C.C. "+data.tNombre,font:FONT,size:SZ})]}),
+      new Paragraph({spacing:{after:40},children:[new TextRun({text:"C.C. Dirección del Trabajo",font:FONT,size:SZ})]}),
     ]
   }]});
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, "No_Renovacion_"+data.tNombre.replace(" ","_")+".docx");
+  saveAs(blob, "No_Renovacion_"+data.tNombre.replace(/ /g,"_")+".docx");
 }
 
 // ── Estilos ───────────────────────────────────────────────────────────────────
@@ -576,6 +655,30 @@ export default function App() {
       } else if (docTab==="no_renovacion") {
         if (!tNombre) throw new Error("Ingresa el nombre del trabajador");
         await generarNoRenovacion({empresa, tNombre, tRut, tCargo, nrFechaDoc, nrFechaTermino, nrMotivo});
+        // Buscar si el trabajador ya existe en el Sheet
+        const listaActual = await apiListar(empresa);
+        const existe = listaActual.find(t =>
+          t.rut === tRut || t.nombre+" "+t.apellido === tNombre
+        );
+        if (existe) {
+          // Desactivar el existente
+          await apiDesactivar(existe.id);
+        } else {
+          // Crear como inactivo si no existia
+          const partes = tNombre.trim().split(" ");
+          const apellido = partes.slice(-1)[0];
+          const nombre = partes.slice(0,-1).join(" ");
+          await apiGuardar({
+            id: Date.now().toString(),
+            nombre, apellido, rut: tRut,
+            empresa, cargo: tCargo,
+            domicilio: "", email: "", telefono: "",
+            banco: "", tipoCuenta: "", cuenta: "",
+            fechaIngreso: "", estado: "Inactivo"
+          });
+        }
+        // Refrescar lista
+        await cargarTrabajadores(empresa);
       }
       setAlert({t:"s", m:"Documento generado y descargado correctamente."});
     } catch(e) {
