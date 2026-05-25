@@ -660,7 +660,17 @@ function FormTrabSimple({nombre, onNombre, rut, onRut, cargo, onCargo, trabSheet
             <div><LBL first>Nombre y apellido</LBL><input style={S.inp} value={nombre} onChange={e=>onNombre(e.target.value)} placeholder="Juan Perez"/></div>
             <div><LBL first>RUT</LBL><input style={S.inp} value={rut} onChange={e=>onRut(fmtRut(e.target.value))} placeholder="12.345.678-9"/></div>
           </div>
-          {!sinCargo && <><LBL>Cargo</LBL><input style={S.inp} value={cargo} onChange={e=>onCargo(e.target.value)} placeholder="Garzon - Barista"/></>}
+          {!sinCargo && <>
+            <LBL>Cargo</LBL>
+            <select style={S.sel} value={cargo} onChange={e=>onCargo(e.target.value)}>
+              <option value="">-- Selecciona --</option>
+              <option value="Garzon - Barista">Garzon - Barista</option>
+              <option value="Cocinero - Personal de Cocina">Cocinero - Personal de Cocina</option>
+              <option value="Operario Multifuncional de Almacen y Alimentos al Paso">Operario Multifuncional de Almacen y Alimentos al Paso</option>
+              <option value="otro">Otro (ingresar)</option>
+            </select>
+            {cargo==="otro" && <input style={{...S.inp,marginTop:6}} placeholder="Escribe el cargo..." onChange={e=>onCargo(e.target.value)}/>}
+          </>}
         </div>
       )}
     </div>
@@ -692,7 +702,16 @@ function FormPF({value, onChange}) {
         <div><LBL>Numero</LBL><input style={S.inp} value={value.num} onChange={e=>u("num",e.target.value)} placeholder="123"/></div>
         <div><LBL>Comuna</LBL><input style={S.inp} value={value.comuna} onChange={e=>u("comuna",e.target.value)} placeholder="Ñuñoa"/></div>
       </div>
-      <LBL>Ciudad</LBL><input style={S.inp} value={value.ciudad} onChange={e=>u("ciudad",e.target.value)} placeholder="Santiago"/>
+      <LBL>Ciudad</LBL>
+      <select style={S.sel} value={value.ciudad} onChange={e=>u("ciudad",e.target.value)||u("comuna","")}>
+        <option value="">-- Selecciona ciudad --</option>
+        {LISTA_CIUDADES.map(c=><option key={c}>{c}</option>)}
+      </select>
+      <LBL>Comuna</LBL>
+      <select style={S.sel} value={value.comuna} onChange={e=>u("comuna",e.target.value)} disabled={!value.ciudad||CIUDADES_COMUNAS[value.ciudad]?.length===0}>
+        <option value="">-- Selecciona comuna --</option>
+        {value.ciudad && CIUDADES_COMUNAS[value.ciudad]?.map(c=><option key={c}>{c}</option>)}
+      </select>
       <div style={S.r2}>
         <div><LBL>Email</LBL><input style={S.inp} value={value.email} onChange={e=>u("email",e.target.value)} placeholder="correo@gmail.com"/></div>
         <div><LBL>Telefono</LBL><input style={S.inp} value={value.tel} onChange={e=>u("tel",e.target.value)} placeholder="9XXXXXXXX"/></div>
@@ -757,7 +776,7 @@ export default function App() {
   const [tNac, setTNac] = useState("Chilena");
   const [tCivil, setTCivil] = useState("Soltero(a)");
   const [tIdSheet, setTIdSheet] = useState("");
-  const getTDom = () => { const dir=[tCalle, tNum, tDepto].filter(Boolean).join(" "); return dir+(tComuna?(" "+tComuna)+",":" ")+(tCiudad?" "+tCiudad:"."); };
+  const getTDom = () => { const dir=[tCalle,tNum,tDepto].filter(Boolean).join(" "); return (dir?dir+" ":"")+tComuna+(tCiudad?", "+tCiudad:"."); };
   const getTCargo = () => tCargoKey==="otro"?tCargoOtro: tCargoKey==="garzon"?"Garzon - Barista": tCargoKey==="cocina"?"Cocinero - Personal de Cocina": tCargoKey==="operario"?"Operario Multifuncional de Almacen y Alimentos al Paso": tCargo;
 
   const [anFecha, setAnFecha] = useState(today);
@@ -800,7 +819,7 @@ export default function App() {
           id: Date.now().toString(),
           nombre: pf.nombre, apellido: pf.apellido, rut: pf.rut,
           empresa, cargo: getCargoN(),
-          domicilio: [pf.calle,pf.num,pf.comuna,pf.ciudad].filter(Boolean).join(", "),
+          domicilio: ([pf.calle,pf.num,pf.depto].filter(Boolean).join(" "))+(pf.comuna?" "+pf.comuna+",":"")+(pf.ciudad?" "+pf.ciudad:""),
           email: pf.email, telefono: pf.tel,
           banco: pf.banco, tipoCuenta: pf.tipoCuenta, cuenta: pf.cuenta,
           fechaIngreso: inicio, estado: "Activo"
