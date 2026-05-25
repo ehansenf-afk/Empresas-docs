@@ -610,7 +610,7 @@ const pill = (a) => ({ padding:"8px 16px", borderRadius:20, fontSize:13, cursor:
 const dtcSt = (a) => ({ padding:"10px 6px", border:a?"2px solid #185FA5":"1px solid #e0e0db", borderRadius:10, cursor:"pointer", textAlign:"center", background:a?"#EBF3FF":"white" });
 
 function LBL({children, first}) { return <label style={{...S.lbl, marginTop:first?0:14}}>{children}</label>; }
-function FormTrabSimple({nombre, onNombre, rut, onRut, cargo, onCargo, trabSheet, loadingTrabs, onSelectTrab}) {
+function FormTrabSimple({nombre, onNombre, rut, onRut, cargo, onCargo, trabSheet, loadingTrabs, onSelectTrab, sinCargo}) {
   const [modo, setModo] = useState("lista"); // "lista" | "manual"
   return (
     <div style={S.card}>
@@ -645,7 +645,7 @@ function FormTrabSimple({nombre, onNombre, rut, onRut, cargo, onCargo, trabSheet
             <div><LBL first>Nombre y apellido</LBL><input style={S.inp} value={nombre} onChange={e=>onNombre(e.target.value)} placeholder="Juan Perez"/></div>
             <div><LBL first>RUT</LBL><input style={S.inp} value={rut} onChange={e=>onRut(fmtRut(e.target.value))} placeholder="12.345.678-9"/></div>
           </div>
-          <LBL>Cargo</LBL><input style={S.inp} value={cargo} onChange={e=>onCargo(e.target.value)} placeholder="Garzon - Barista"/>
+          {!sinCargo && <><LBL>Cargo</LBL><input style={S.inp} value={cargo} onChange={e=>onCargo(e.target.value)} placeholder="Garzon - Barista"/></>}
         </div>
       )}
     </div>
@@ -957,6 +957,7 @@ export default function App() {
             rut={tRut} onRut={setTRut}
             cargo={tCargo} onCargo={setTCargo}
             trabSheet={trabSheet} loadingTrabs={loadingTrabs}
+            sinCargo={true}
             onSelectTrab={t=>{ setTNombre(t.nombre); setTApellido(t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); setTCargoKey(""); setTCargoOtro(""); setTNac(t.nacionalidad||"Chilena"); setTCivil(t.estadoCivil||"Soltero(a)"); setTIdSheet(t.id||""); const domParts=(t.domicilio||"").split(","); setTCalle(domParts[0]||""); setTComuna(domParts[1]?.trim()||""); setTCiudad(domParts[2]?.trim()||""); }}
           />
           {/* Datos adicionales trabajador para el anexo */}
