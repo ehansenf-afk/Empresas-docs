@@ -614,7 +614,6 @@ export default function App() {
 
   const [nrFechaDoc, setNrFechaDoc] = useState(today);
   const [nrFechaTermino, setNrFechaTermino] = useState(today);
-  const [nrMotivo, setNrMotivo] = useState("");
 
   const getCargoN = () => {
     if (cargoKey==="garzon") return "Garzon - Barista";
@@ -654,7 +653,7 @@ export default function App() {
         await generarAmonAtraso({empresa, tNombre, tRut, tCargo, aaFecha, aaDetalle, aaReinc});
       } else if (docTab==="no_renovacion") {
         if (!tNombre) throw new Error("Ingresa el nombre del trabajador");
-        await generarNoRenovacion({empresa, tNombre, tRut, tCargo, nrFechaDoc, nrFechaTermino, nrMotivo});
+        await generarNoRenovacion({empresa, tNombre, tRut, tCargo, nrFechaDoc, nrFechaTermino});
         // Buscar si el trabajador ya existe en el Sheet
         const listaActual = await apiListar(empresa);
         const existe = listaActual.find(t =>
@@ -867,8 +866,7 @@ export default function App() {
               <div><LBL first>Fecha del documento</LBL><input style={S.inp} type="date" value={nrFechaDoc} onChange={e=>setNrFechaDoc(e.target.value)}/></div>
               <div><LBL first>Fecha termino contrato</LBL><input style={S.inp} type="date" value={nrFechaTermino} onChange={e=>setNrFechaTermino(e.target.value)}/></div>
             </div>
-            <LBL>Motivo <span style={{color:"#999",fontSize:11}}>(opcional)</span></LBL>
-            <textarea style={S.ta} value={nrMotivo} onChange={e=>setNrMotivo(e.target.value)} placeholder="Ej: Necesidades operacionales, termino de proyecto..."/>
+
           </div>
         </>}
 
