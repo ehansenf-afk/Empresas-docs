@@ -727,6 +727,7 @@ export default function App() {
   const [turno, setTurno] = useState(DIAS_C.map(()=>({on:false,e:"",s:""})));
   const updTurno = useCallback((i,k,val)=>setTurno(p=>p.map((r,j)=>j===i?{...r,[k]:val}:r)),[]);
 
+  const [modoAnexo, setModoAnexo] = useState("lista");
   const [tNombre, setTNombre] = useState("");
   const [tApellido, setTApellido] = useState("");
   const [tRut, setTRut] = useState("");
@@ -952,49 +953,78 @@ export default function App() {
         </>}
 
         {docTab==="anexo" && <>
-          <FormTrabSimple
-            nombre={tNombre} onNombre={setTNombre}
-            rut={tRut} onRut={setTRut}
-            cargo={tCargo} onCargo={setTCargo}
-            trabSheet={trabSheet} loadingTrabs={loadingTrabs}
-            sinCargo={true}
-            onSelectTrab={t=>{ setTNombre(t.nombre); setTApellido(t.apellido); setTRut(t.rut); setTCargo(t.cargo||""); setTCargoKey(""); setTCargoOtro(""); setTNac(t.nacionalidad||"Chilena"); setTCivil(t.estadoCivil||"Soltero(a)"); setTIdSheet(t.id||""); const domParts=(t.domicilio||"").split(","); setTCalle(domParts[0]||""); setTComuna(domParts[1]?.trim()||""); setTCiudad(domParts[2]?.trim()||""); }}
-          />
-          {/* Datos adicionales trabajador para el anexo */}
           <div style={S.card}>
-            <div style={{fontSize:14,fontWeight:700,marginBottom:12}}>Datos adicionales del trabajador</div>
-            <div style={S.r2}>
-              <div><LBL first>Nombre(s)</LBL><input style={S.inp} value={tNombre} onChange={e=>setTNombre(e.target.value)} placeholder="Juan"/></div>
-              <div><LBL first>Apellido(s)</LBL><input style={S.inp} value={tApellido} onChange={e=>setTApellido(e.target.value)} placeholder="Perez Garcia"/></div>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:10}}>Trabajador</div>
+            <div style={{display:"flex",gap:8,marginBottom:14}}>
+              <button style={pill(modoAnexo==="lista")} onClick={()=>setModoAnexo("lista")}>📋 Seleccionar</button>
+              <button style={pill(modoAnexo==="manual")} onClick={()=>setModoAnexo("manual")}>✏️ Ingresar manual</button>
             </div>
-            <div style={S.r2}>
-              <div><LBL>Nacionalidad</LBL><input style={S.inp} value={tNac} onChange={e=>setTNac(e.target.value)}/></div>
-              <div><LBL>Estado civil</LBL>
+
+            {/* SELECCIONAR de base de datos */}
+            {modoAnexo==="lista" && (
+              loadingTrabs
+                ? <div style={{color:"#888",fontSize:13,padding:"10px 0"}}>Cargando trabajadores...</div>
+                : trabSheet.length===0
+                  ? <div style={{color:"#888",fontSize:13,padding:"10px 0"}}>No hay trabajadores activos. Genera primero un contrato.</div>
+                  : trabSheet.map(t=>(
+                      <div key={t.id} onClick={()=>{
+                        setTNombre(t.nombre); setTApellido(t.apellido); setTRut(t.rut);
+                        setTCargo(t.cargo||""); setTCargoKey(""); setTCargoOtro("");
+                        setTNac(t.nacionalidad||"Chilena"); setTCivil(t.estadoCivil||"Soltero(a)");
+                        setTIdSheet(t.id||"");
+                        const dp=(t.domicilio||"").split(",");
+                        setTCalle(dp[0]?.trim()||""); setTNum(""); setTDepto("");
+                        setTComuna(dp[1]?.trim()||""); setTCiudad(dp[2]?.trim()||"");
+                        setModoAnexo("datos");
+                      }} style={{display:"flex",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #e8e8e5",gap:10,cursor:"pointer"}}>
+                        <div style={{width:34,height:34,borderRadius:"50%",background:"#EBF3FF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:"#185FA5",flexShrink:0}}>{(t.nombre||"?").charAt(0)}</div>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:13,fontWeight:600}}>{t.nombre} {t.apellido}</div>
+                          <div style={{fontSize:11,color:"#888"}}>{t.cargo||"-"} · {t.rut}</div>
+                        </div>
+                        <span style={{color:"#185FA5",fontSize:18}}>›</span>
+                      </div>
+                    ))
+            )}
+
+            {/* INGRESAR MANUAL o editar datos cargados */}
+            {(modoAnexo==="manual"||modoAnexo==="datos") && (
+              <div>
+                {modoAnexo==="datos" && <div style={{background:"#E1F5EE",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#0F6E56",marginBottom:12}}>✓ Datos cargados — puedes editar si es necesario</div>}
+                <div style={S.r2}>
+                  <div><LBL first>Nombre(s)</LBL><input style={S.inp} value={tNombre} onChange={e=>setTNombre(e.target.value)} placeholder="Juan"/></div>
+                  <div><LBL first>Apellido(s)</LBL><input style={S.inp} value={tApellido} onChange={e=>setTApellido(e.target.value)} placeholder="Perez Garcia"/></div>
+                </div>
+                <div style={S.r2}>
+                  <div><LBL>RUT</LBL><input style={S.inp} value={tRut} onChange={e=>setTRut(fmtRut(e.target.value))} placeholder="12.345.678-9"/></div>
+                  <div><LBL>Nacionalidad</LBL><input style={S.inp} value={tNac} onChange={e=>setTNac(e.target.value)}/></div>
+                </div>
+                <LBL>Estado civil</LBL>
                 <select style={S.sel} value={tCivil} onChange={e=>setTCivil(e.target.value)}>
                   {["Soltero(a)","Casado(a)","Divorciado(a)","Viudo(a)"].map(o=><option key={o}>{o}</option>)}
                 </select>
+                <LBL>Cargo</LBL>
+                <select style={S.sel} value={tCargoKey} onChange={e=>{setTCargoKey(e.target.value);if(e.target.value!=="otro")setTCargoOtro("");}}>
+                  <option value="">-- Selecciona --</option>
+                  <option value="garzon">Garzon - Barista</option>
+                  <option value="cocina">Cocinero - Personal de Cocina</option>
+                  <option value="operario">Operario Multifuncional de Almacen y Alimentos al Paso</option>
+                  <option value="otro">Otro</option>
+                </select>
+                {tCargoKey==="otro" && <input style={{...S.inp,marginTop:6}} value={tCargoOtro} onChange={e=>setTCargoOtro(e.target.value)} placeholder="Escribe el cargo..."/>}
+                <LBL>Domicilio</LBL>
+                <div style={S.r2}>
+                  <div><input style={S.inp} value={tCalle} onChange={e=>setTCalle(e.target.value)} placeholder="Calle / Av."/></div>
+                  <div><input style={S.inp} value={tNum} onChange={e=>setTNum(e.target.value)} placeholder="Numero"/></div>
+                </div>
+                <div style={S.r2}>
+                  <div><input style={{...S.inp,marginTop:6}} value={tDepto} onChange={e=>setTDepto(e.target.value)} placeholder="Depto (opcional)"/></div>
+                  <div><input style={{...S.inp,marginTop:6}} value={tComuna} onChange={e=>setTComuna(e.target.value)} placeholder="Comuna"/></div>
+                </div>
+                <input style={{...S.inp,marginTop:6}} value={tCiudad} onChange={e=>setTCiudad(e.target.value)} placeholder="Ciudad"/>
+                {(tCalle||tComuna) && <div style={{fontSize:11,color:"#888",marginTop:6}}>Vista: {[tCalle,tNum,tDepto].filter(Boolean).join(" ")}{tComuna?" "+tComuna+",":""}{tCiudad?" "+tCiudad:"."}</div>}
               </div>
-            </div>
-            <LBL>Cargo</LBL>
-            <select style={S.sel} value={tCargoKey} onChange={e=>setTCargoKey(e.target.value)}>
-              <option value="">-- Selecciona --</option>
-              <option value="garzon">Garzon - Barista</option>
-              <option value="cocina">Cocinero - Personal de Cocina</option>
-              <option value="operario">Operario Multifuncional de Almacen y Alimentos al Paso</option>
-              <option value="otro">Otro</option>
-            </select>
-            {tCargoKey==="otro" && <input style={{...S.inp,marginTop:6}} value={tCargoOtro} onChange={e=>setTCargoOtro(e.target.value)} placeholder="Escribe el cargo..."/>}
-            <LBL>Domicilio</LBL>
-            <div style={S.r2}>
-              <div><input style={S.inp} value={tCalle} onChange={e=>setTCalle(e.target.value)} placeholder="Calle / Av."/></div>
-              <div><input style={S.inp} value={tNum} onChange={e=>setTNum(e.target.value)} placeholder="Numero"/></div>
-            </div>
-            <div style={S.r2}>
-              <div><input style={{...S.inp,marginTop:6}} value={tDepto} onChange={e=>setTDepto(e.target.value)} placeholder="Depto (opcional)"/></div>
-              <div><input style={{...S.inp,marginTop:6}} value={tComuna} onChange={e=>setTComuna(e.target.value)} placeholder="Comuna"/></div>
-            </div>
-            <input style={{...S.inp,marginTop:6}} value={tCiudad} onChange={e=>setTCiudad(e.target.value)} placeholder="Ciudad"/>
-            {(tCalle||tComuna) && <div style={{fontSize:11,color:"#888",marginTop:6}}>Vista previa: {[tCalle,tNum,tDepto].filter(Boolean).join(" ")}{tComuna?" "+tComuna+",":""}{tCiudad?" "+tCiudad:"."}</div>}
+            )}
           </div>
           <div style={S.card}>
             <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Tipo de anexo</div>
