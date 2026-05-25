@@ -7,12 +7,12 @@ const EMP = {
   "Malvarrosa SpA": {
     nombre: "MALVARROSA SPA", rut: "76.475.913-3",
     rep: "MAGALY DEL CARMEN FIGUEROA ASTUDILLO", repRut: "6.974.618-7",
-    dom: "Av. Ortuzar 250, Nunoa, Santiago"
+    dom: "Av. Ortuzar 250, Ñuñoa, Santiago"
   },
   "Eric Hansen EIRL": {
     nombre: "VENTA DE ALIMENTOS ERIC FELIPE HANSEN FIGUEROA EIRL", rut: "77.840.316-1",
     rep: "ERIC FELIPE HANSEN FIGUEROA", repRut: "19.077.228-4",
-    dom: "Av. Ossa 1624, Nunoa, Santiago"
+    dom: "Av. Ossa 1624, Ñuñoa, Santiago"
   }
 };
 const SUELDOS = { 42: 539000, 30: 385000, 20: 256667 };
@@ -70,7 +70,7 @@ function fmtRut(rut) {
 }
 
 function getLugar(emp) {
-  return emp==="Malvarrosa SpA" ? "Casa Turquesa, Av. Ortuzar 250, Nunoa, Santiago" : "Av. Ossa 1624, Nunoa, Santiago";
+  return emp==="Malvarrosa SpA" ? "Casa Turquesa, Av. Ortuzar 250, Ñuñoa, Santiago" : "Av. Ossa 1624, Ñuñoa, Santiago";
 }
 
 // ── DOCX helpers ──────────────────────────────────────────────────────────────
@@ -194,7 +194,7 @@ async function generarContratoPF(data) {
       titulo("CONTRATO DE TRABAJO"),
       P([]),
       P([
-        T("En Nunoa, a "), T(hoy,{bold:true}), T(", entre "), T(emp.nombre,{bold:true}),
+        T("En Ñuñoa, a "), T(hoy,{bold:true}), T(", entre "), T(emp.nombre,{bold:true}),
         T(", R.U.T. "+emp.rut+", con domicilio en "+emp.dom+", representado legalmente por don(a) "),
         T(emp.rep,{bold:true}), T(", cedula de identidad "+emp.repRut+", en adelante el \"Empleador\", y don(a) "),
         T(data.nombre+" "+data.apellido,{bold:true}),
@@ -211,7 +211,7 @@ async function generarContratoPF(data) {
       art("SEPTIMO :", "El trabajador se obliga y compromete expresamente a cumplir las instrucciones que le sean impartidas por su jefe inmediato o por la Gerencia de la empresa y a acatar en todas sus partes las disposiciones establecidas en el Reglamento de Orden, Higiene y Seguridad, las que declara conocer y que se consideran parte integrante del presente contrato, reglamento del cual el trabajador recibe un ejemplar en este acto."),
       art("OCTAVO :", "Las partes acuerdan que los atrasos reiterados, sin causa justificada, se consideraran incumplimiento grave de las obligaciones que impone el presente contrato y daran lugar a la aplicacion de la caducidad del contrato, contemplada en el Art. 160 N7 del Codigo del Trabajo. Se entendera por atraso reiterado el llegar despues de la hora de ingreso durante 7 dias maximos, seguidos o no, en cada mes calendario."),
       art("NOVENO :", "El presente contrato comenzara el "+fmtF(data.inicio)+" y tendra duracion hasta el dia "+fmtF(data.termino)+", y cualquiera de las partes podra ponerle termino."),
-      art("DECIMO :", "Para todas las cuestiones a que eventualmente pueda dar origen este contrato, las partes fijan domicilio en la comuna de Nunoa."),
+      art("DECIMO :", "Para todas las cuestiones a que eventualmente pueda dar origen este contrato, las partes fijan domicilio en la comuna de Ñuñoa."),
       art("DECIMO PRIMERO :", "Todas las recetas, preparaciones, fichas tecnicas, procesos productivos, formulas y creaciones desarrolladas por el trabajador en el ejercicio de sus funciones seran de propiedad exclusiva del Empleador. El trabajador se obliga a no divulgar, reproducir ni utilizar dicha informacion fuera de la empresa, ni durante ni despues de la vigencia del presente contrato."),
       art("DECIMO SEGUNDO :", "Se deja constancia que el Empleado ingreso al servicio de la Empresa con fecha "+fmtF(data.inicio)+". El presente contrato se firma en dos ejemplares del mismo tenor y fecha, quedando uno en poder de cada parte."),
       P([T("")], AlignmentType.JUSTIFIED, 200),
@@ -248,7 +248,7 @@ async function generarAnexo(data) {
     children:[
       titulo("ANEXO DE CONTRATO DE TRABAJO"),
       P([]),
-      P([T("En Nunoa, a "), T(hoy,{bold:true}), T(", entre "), T(emp.nombre,{bold:true}), T(", R.U.T. "+emp.rut+", representado por "+emp.rep+", cedula "+emp.repRut+", en adelante el Empleador, y don(a) "), T(data.tNombre,{bold:true}), T(", RUT "+data.tRut+", cargo: "+data.tCargo+", en adelante el Trabajador, se ha convenido el siguiente Anexo al Contrato de Trabajo:")], AlignmentType.JUSTIFIED, 120),
+      P([T("En Ñuñoa, a "), T(hoy,{bold:true}), T(", entre "), T(emp.nombre,{bold:true}), T(", R.U.T. "+emp.rut+", representado por "+emp.rep+", cedula "+emp.repRut+", en adelante el Empleador, y don(a) "), T(data.tNombre,{bold:true}), T(", RUT "+data.tRut+", cargo: "+data.tCargo+", en adelante el Trabajador, se ha convenido el siguiente Anexo al Contrato de Trabajo:")], AlignmentType.JUSTIFIED, 120),
       art("ARTICULO PRIMERO :", "Las partes acuerdan modificar el contrato de trabajo en los siguientes terminos: "+tiposMap[data.anTipo]+". "+data.anDesc),
       art("ARTICULO SEGUNDO :", "Nueva condicion contractual: "+data.anCond+". Esta modificacion rige a partir de "+fmtF(data.anFecha)+"."),
       art("ARTICULO TERCERO :", "En todo lo demas, las clausulas del contrato original permanecen vigentes e inalteradas, siendo este Anexo parte integrante del mismo."),
@@ -270,7 +270,7 @@ async function generarAmonInasistencia(data) {
     children:[
       titulo("CARTA DE AMONESTACION"),
       P([T("Por Inasistencias Injustificadas",{bold:true})], AlignmentType.CENTER, 200),
-      P([T("Nunoa, "+fmtF(data.aiFecha))], AlignmentType.JUSTIFIED, 120),
+      P([T("Ñuñoa, "+fmtF(data.aiFecha))], AlignmentType.JUSTIFIED, 120),
       P([T("Senor(a):")], AlignmentType.JUSTIFIED, 40),
       P([T(data.tNombre,{bold:true})], AlignmentType.JUSTIFIED, 40),
       P([T("Cargo: "+data.tCargo)], AlignmentType.JUSTIFIED, 40),
@@ -304,7 +304,7 @@ async function generarAmonAtraso(data) {
     children:[
       titulo("CARTA DE AMONESTACION"),
       P([T("Por Atrasos Reiterados",{bold:true})], AlignmentType.CENTER, 200),
-      P([T("Nunoa, "+fmtF(data.aaFecha))], AlignmentType.JUSTIFIED, 120),
+      P([T("Ñuñoa, "+fmtF(data.aaFecha))], AlignmentType.JUSTIFIED, 120),
       P([T("Senor(a):")], AlignmentType.JUSTIFIED, 40),
       P([T(data.tNombre,{bold:true})], AlignmentType.JUSTIFIED, 40),
       P([T("Cargo: "+data.tCargo)], AlignmentType.JUSTIFIED, 40),
@@ -337,7 +337,7 @@ async function generarNoRenovacion(data) {
     children:[
       titulo("CARTA DE NO RENOVACION DE CONTRATO"),
       P([]),
-      P([T("Nunoa, "+fmtF(data.nrFechaDoc))], AlignmentType.JUSTIFIED, 120),
+      P([T("Ñuñoa, "+fmtF(data.nrFechaDoc))], AlignmentType.JUSTIFIED, 120),
       P([T("Senor(a):")], AlignmentType.JUSTIFIED, 40),
       P([T(data.tNombre,{bold:true})], AlignmentType.JUSTIFIED, 40),
       P([T("Cargo: "+data.tCargo)], AlignmentType.JUSTIFIED, 40),
@@ -413,7 +413,7 @@ function FormPF({value, onChange}) {
       <LBL>Calle</LBL><input style={S.inp} value={value.calle} onChange={e=>u("calle",e.target.value)} placeholder="Av. Ejemplo"/>
       <div style={S.r2}>
         <div><LBL>Numero</LBL><input style={S.inp} value={value.num} onChange={e=>u("num",e.target.value)} placeholder="123"/></div>
-        <div><LBL>Comuna</LBL><input style={S.inp} value={value.comuna} onChange={e=>u("comuna",e.target.value)} placeholder="Nunoa"/></div>
+        <div><LBL>Comuna</LBL><input style={S.inp} value={value.comuna} onChange={e=>u("comuna",e.target.value)} placeholder="Ñuñoa"/></div>
       </div>
       <LBL>Ciudad</LBL><input style={S.inp} value={value.ciudad} onChange={e=>u("ciudad",e.target.value)} placeholder="Santiago"/>
       <div style={S.r2}>
